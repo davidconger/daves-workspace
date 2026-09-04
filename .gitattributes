@@ -1,0 +1,10 @@
+# Normalize text to LF in the repository, check out native on Windows.
+* text=auto
+
+# Explicitly binary, so git never tries to normalize or diff them as text.
+*.png binary
+*.jpg binary
+*.stl binary
+
+# Treat SVG as text so diffs are readable.
+*.svg text
