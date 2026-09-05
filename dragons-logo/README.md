@@ -1,7 +1,8 @@
 # Dragons Elite Baseball — logo vectorization
 
 Vector reconstruction of the Dragons Elite Baseball Club mark (dragonselitebbc.com),
-built for 3D printing a keychain. Personal, non-commercial use — this is the club's mark.
+built for 3D printing keychains and pendants. Personal, non-commercial use — this is
+the club's mark.
 
 ![logo](build/render-dragons-elite-logo.png)
 
@@ -154,19 +155,39 @@ idealized and, in the bold variant, thickened. Judge the seams from
 ## STL
 
 `node 8-build-stl.js` writes finished, watertight STLs directly. No CAD round trip,
-no DXF conversion, no manual alignment.
+no DXF conversion, no manual alignment. It builds a table of **products**, each pinned
+to a real-world size on a named axis:
 
 ```
-stl/emboss-<option>/dragons-keychain.stl   one solid part
-stl/ams-<option>/{gray,green,white,red}.stl       four parts, colour full depth
-stl/amscap-<option>/{gray,green,white,red}.stl    four parts, colour in the top 3 layers
+stl/keychain-56mm/emboss/{plate,green,red}.stl        + dragons-combined.stl
+stl/keychain-56mm/amscap/{gray,green,white,red}.stl
+stl/pendant-223mm-flush/amscap/{gray,green,white,red}.stl
+stl/pendant-223mm-tiered/tiered/{gray,white,red,green}.stl
 ```
 
-with `<option>` one of `none`, `winghole`, `tab`, `toptab-half`, `toptab-short`.
+| Product | Size | Thick | Mount |
+|---|---|---|---|
+| `keychain-56mm` | 56 mm tall × 69.5 mm | 5.6 mm | internalised slot |
+| `pendant-223mm-flush` | 223 mm wide × 179.6 mm | 15.0 mm | 22 mm chain loop |
+| `pendant-223mm-tiered` | 223 mm wide × 179.6 mm | 15.0 mm | 22 mm chain loop |
 
-Every solid reports **0 open edges**. `node 9-preview-stl.js` renders them all to
-`build/stl-preview-emboss.png` and `build/stl-preview-ams.png` so they can be judged
-without opening a slicer.
+Every shell reports **0 open edges**. Each style folder also gets a `manifest.json`
+recording the final size and the mount's coordinates *after* recentring, which is what
+lets the diagnostics cut a section through the mount without guessing where it is.
+
+`node 9-preview-stl.js` renders each product to `preview/<product>.png`, including
+true cross-sections through the mount.
+
+### Artwork scales; hardware does not
+
+The obvious way to resize is to scale the model in the slicer. That is wrong here.
+Going from 50 mm to 56 mm would drag the keyring pocket from 4.0 mm to 4.5 mm and the
+backing plate from 5.0 mm to 5.6 mm — but a split ring is the same wire whatever size
+the logo is, and 5 mm of plate is 5 mm because that is what it takes to print stiff.
+
+So `K` (millimetres per SVG unit) is derived per product from the silhouette's own
+bounding box, and **every mount dimension is stored in millimetres and converted at
+draw time**. Only the drawing scales.
 
 ### Prefer `amscap` over `ams`
 
@@ -225,28 +246,73 @@ Run `node 7-analyze-print.js` for the heatmap.
 
 ### Choosing a variant
 
-**emboss** is one solid part: a 2.0 mm backing plate carrying the whole footprint, with
+**emboss** is one solid part: a 5.0 mm backing plate carrying the whole footprint, with
 the green body and red seams standing 0.6 mm proud. Prints in a single material; add
-colour with a filament swap at the 2.0 mm step, or leave it as a relief.
+colour with a filament swap at the 5.0 mm step, or leave it as a relief.
 
-**ams** is one STL per colour, all 2.6 mm tall so the face is flush. The four parts
-tile the footprint exactly with no overlaps. Import them together as a multi-part
-object and assign a filament to each.
+**amscap** is one STL per colour, flush at the top. Import them together as a
+multi-part object and assign a filament to each.
 
-**Keyring**: all five options use a 3 mm hole, which clears the 1.5 mm wire of a
-standard split ring.
+**tiered** steps each colour to its own height above a common base, back of the image
+to front — gray keyline lowest, then white ball, then red seams, then the green dragon
+highest. Copied from the Mariners reference plaque.
 
-| Option | Hangs | Load path | Notes |
-|---|---|---|---|
-| `none` | — | — | No attachment. Magnet, stand, or your own hole |
-| `winghole` | 76° off upright | 6.1 mm of stock | Invisible, adds no shape |
-| `tab` | 80° off upright | full body | Lug on the left edge, not part of the logo |
-| `toptab-half` | 12.5° off upright | 4.0 mm, ~53 kg | Lug on the dragon's back, flare cut to half |
-| `toptab-short` | 12.5° off upright | 4.0 mm, ~53 kg | Same, flare cut back further |
+### The internalised mount
 
-The wing hole sits at the point of maximum material in the left wing, found by distance
-transform. The largest inscribed circle in the whole logo is dead centre of the ball,
-which is useless, because that is the floating piece.
+Copied off the previous Issaquah keychain rather than invented. It is not a ring and
+not a hole: it is a **half-disc pocket buried in the middle of the plate's thickness**,
+opening at the outer edge, with a post standing across the mouth for the split ring to
+loop around. Nothing protrudes and **nothing shows on either face** — the drawn
+silhouette survives completely intact, flare and all.
+
+Decoded from `Copy of Issaquah.stl` by grouping its triangles into axis-aligned planes
+and reading the extents off directly:
+
+| | Issaquah original | this build |
+|---|---|---|
+| pocket radius | 4.0 mm, centred on the edge | same |
+| solid floor / roof | 1.0 mm each | same |
+| post | 2.0 × 1.4 mm | 2.00 × 1.36 mm |
+| opening each side | 3.0 mm | 2.94 / 2.96 mm |
+| pocket behind the post | 2.75 mm | 2.64 mm |
+| channel height | 4.0 mm (6 mm plate) | 3.02 mm (5 mm plate) |
+
+It is built as three stacked extrusions: full plate for the floor, plate-minus-pocket
+plus the post for the middle, full plate again for the roof. In plan the post is an
+**island**, unconnected to anything; through the thickness it is a solid post from
+build plate to top face, bonded to the floor below and the roof above. That is why the
+strength figure is a shear area (5.6 mm² along the layer lines), not a beam
+calculation — an earlier version of this README got that wrong.
+
+**The bar has to be turned to match the edge.** Issaquah's mount sits on the flat top
+of a letter `I`, so an axis-aligned post lands square in the mouth. The dragon's back
+slopes 13.8° where the mount goes, and an axis-aligned post there measured **1.46 mm
+of opening one side against 2.94 mm the other** — too tight for a 1.5 mm split-ring
+wire. Fitting the local edge slope and rotating the post to lie across the chord
+restores it to 2.94 / 2.96 mm. The pocket itself is a circle, so it needs no rotation.
+
+### Where the mount goes: hanging is physics
+
+**A hanging part rotates until its area centroid is directly below the pivot.** The
+centroid is at x = 261, about 3 mm left of the ball's centre at x = 298, so mounting
+over the ball — the intuitive choice — tips the keychain **14.7° nose-up**.
+
+Both the slot and the chain loop are therefore placed at the centroid's own x, and both
+hang **dead level** by construction. The loop keeps working because a disc centred on
+the balance line adds material symmetrically about it, so it cannot shift the balance
+it was placed to satisfy.
+
+The slot also needs the mount to sit somewhere with material behind it. Measured across
+the whole candidate window, the dragon's back carries **35–39 mm of continuous solid**
+below the edge — ample for an 8 mm pocket.
+
+### The chain loop
+
+A real protruding loop, as both pendant references use: 22 mm across with a 12 mm hole,
+leaving a 5 mm ring wall, sunk 5 mm into the dragon's back so the two circles cut an
+**18.4 mm chord** where they merge. That chord is the entire load path. A 6 mm slot
+channel could never take a heavy curb chain, which is why the pendants do not reuse the
+keychain's mount.
 
 ### Where the top lug goes, and why the flare gets cut
 
@@ -268,11 +334,13 @@ way.
 
 **A hanging part rotates until its centroid is under the pivot.** The centroid sits at
 x = 261, about 3 mm left of the ball centre at x = 298, so the top lug variants hang
-12.5° nose-up rather than dead level. Putting the lug over the centroid instead would
-make the tilt zero by construction, at the cost of the lug no longer being centred on
-the ball. Change `const cx = BALL.cx` in `applyKeyring` to swap.
+12.5° nose-up rather than dead level. The slot and ring mounts sit on the centroid
+instead and hang level; `balanceX()` is the one-line difference.
 
-To change size, edit `SIZE_MM` in `8-build-stl.js`.
+To change size or thickness, edit the `PRODUCTS` table at the top of
+`8-build-stl.js` — `sizeMm`, the axis it is pinned to, `plateH` and `reliefH`.
+Issaquah's own base is **6.0 mm**, not 5.0 mm, and its total is 9.0 mm against this
+build's 5.6 mm; raising `plateH` is a one-number change if an exact match is wanted.
 
 ## Minimum feature size
 
@@ -316,8 +384,8 @@ node 4-build-svg.js       # assembles both SVGs, scores against the source
 node 5-export-layers.js   # exports layers/ as filled paths
 node 6-sweep-fit.js       # optional: re-derive the fitting tolerance
 node 7-analyze-print.js   # connectivity + minimum feature check
-node 8-build-stl.js       # writes stl/, watertight
-node 9-preview-stl.js     # renders stl/ to build/stl-preview.png
+node 8-build-stl.js       # writes stl/<product>/<style>/, watertight
+node 9-preview-stl.js     # renders each product to preview/<product>.png
 ```
 
 Shared modules:
@@ -331,6 +399,22 @@ The first three are shared by every phase specifically so the trace, the sweep a
 layer export cannot drift apart.
 
 Diagnostics:
+
+```powershell
+node verify-slot.js [stl/keychain-56mm/emboss]
+```
+
+Probes the **built mesh** for the mount's solid and void bands by ray parity, along the
+edge rather than along x, and reports the openings either side of the post. This is the
+check that caught the axis-aligned post sitting off-centre in a sloping mouth.
+
+```powershell
+node probe-balance.js     # centroid x, and the solid depth available for a pocket
+node mount-dims.js        # groups an STL into axis-aligned planes; how Issaquah was decoded
+node measure-issaquah.js  # shell decomposition + signed volume per shell
+node probe-mount.js       # ASCII cross-sections of a reference STL
+node measure-pendants.js  # pendant bounds (its chain-hole detection is unreliable)
+```
 
 ```powershell
 node crop-compare.js dragons-elite-logo.svg 205 210 95 200 5 cmp-seam

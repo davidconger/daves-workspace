@@ -3,10 +3,11 @@
 `README.md` describes what the pipeline *is*. This describes how it got there: what
 was tried, what turned out to be wrong, and what is worth reusing next time.
 
-**Status as of 2026-09-04:** `amscap-none` printed successfully at 50 mm. The SVG is
-approved, all STL variants are watertight, and `toptab-half` is the chosen attachment
-but has not been printed yet. Height, attachment style and a new attachment concept are
-open for the next round.
+**Status:** `amscap` printed successfully at 50 mm with a top lug, and came out well.
+The SVG is approved. The line has since been reworked into three products — a 56 mm
+keychain with the internalised mount copied off the previous Issaquah keychain, and two
+223 mm pendants on a chain loop. All are watertight; none of the three has been printed
+yet. Overall thickness and a new attachment concept are open for the next round.
 
 ---
 
@@ -14,11 +15,13 @@ open for the next round.
 
 Almost every real problem in this project was found by measuring something that looked
 fine, and almost every wrong turn came from a number that was plausible but measured the
-wrong thing. Three separate metrics had to be thrown away and replaced.
+wrong thing. **Six** separate metrics had to be thrown away and replaced, and two of
+them were only caught because the number they produced looked odd enough to re-check.
 
 The habit that worked: **if a measurement decides a design choice, verify the
-measurement before trusting the choice.** Twice, checking a suspicious-looking number
-revealed a bug that would otherwise have shipped.
+measurement before trusting the choice.** The corollary learned in Phase 6: verify the
+*axis* too. A symmetric feature measured across the wrong direction reads as
+asymmetric, and looks exactly like a real defect.
 
 ---
 
@@ -210,7 +213,96 @@ how the original tip converges. Same cut, completely different read.
 A hanging part rotates until its centroid is under the pivot. Centroid x = 261,
 ball centre x = 298, so the top lug hangs **12.5° nose-up**. Putting the lug over the
 centroid would make it hang dead level but move it off the ball. This was surfaced as a
-choice rather than silently decided.
+choice rather than silently decided — and when the internalised mount arrived in Phase
+6 it was taken, because that mount is invisible so there was nothing left to trade off.
+
+---
+
+## Phase 6 — Copying a mount instead of designing one
+
+The brief was "notice the mount we used on the Issaquah keychain, and how it is
+internalised a bit more instead of a ring." So the job was not to invent an attachment,
+it was to **read one off an existing STL** and re-site it on a different silhouette.
+
+### Decode by grouping triangles into planes
+
+`Copy of Issaquah.stl` is 368 triangles in **four separate shells, all additive
+solids** — it was assembled from bodies, not cut with voids. Rather than eyeball a
+render, `mount-dims.js` groups triangles by which axis-aligned plane they lie in and
+prints the exact extents of each. That gave the pocket radius as **exactly 4.000 mm**
+and, once its centre was known, confirmed it as a clean half-disc: centre x = −38.82,
+±4.0 gives −42.82…−34.82, matching the measured planes to the digit.
+
+Recollection was off, and measurement said so: the user remembered a 5 mm base, but the
+base is **6.0 mm** with a 3.0 mm raised layer on top. Worth saying out loud rather than
+quietly building to the wrong number.
+
+### Wrong metric #5 — the bar is a post, not a beam
+
+The first strength figure treated the bar as a fixed-fixed beam spanning the mouth and
+reported "breaks near 5.3 kg". That is not how it is built. In plan the bar is an
+**island** — connected to nothing. Through the thickness it is a solid post from the
+build plate to the top face, bonded to the 1 mm floor below and the 1 mm roof above.
+A ring pulling on it shears those two bonds over 5.6 mm², and because the part prints
+flat that load runs **along** the layers rather than trying to peel them apart. The
+beam number was not conservative or optimistic, it was answering a different question.
+
+### Wrong metric #6 — measuring the opening along the wrong axis
+
+The first probe of the built mount measured material along **x** and reported openings
+of 1.46 mm one side and 2.94 mm the other — alarming, since a split-ring wire is
+1.5 mm. The cause was real but the measurement was still wrong twice over.
+
+Real cause: Issaquah's mount sits on the flat top of a letter `I`, so an axis-aligned
+bar lands square in the mouth. The dragon's back slopes **13.8°**, and a disc centred
+on a sloping edge opens along that slope — so an axis-aligned bar sits crooked in it.
+Fitting the local edge and rotating the bar to lie across the chord fixed it.
+
+Wrong measurement: even after the fix, probing along x would still have shown an
+asymmetry, because the mouth is not horizontal. The probe had to be re-cut along the
+edge tangent. **A symmetric feature measured on the wrong axis reads as asymmetric.**
+
+### Clipping cannot show a buried void
+
+The first attempt at a cut-away preview kept every triangle lying entirely below the cut
+height. It showed an untouched solid plate and no pocket at all — which looked like the
+pocket had failed to appear. It hadn't. The walls *around* the void span the cut plane,
+so they were discarded along with it, leaving only the solid floor below visible.
+
+The fix is a genuine planar section: intersect each triangle with the plane and keep the
+segment. That draws the outline of the material actually present at that height, which
+is the only honest way to see a feature that is by design invisible from outside.
+
+### Two sign errors, one silent and one obvious
+
+The ray-parity probe used Möller–Trumbore with a hardcoded ray direction, and the
+`d × e₂` cross product came out negated. The negation cancels in `u` but not in `v`, so
+the test half-worked and returned confetti: hundreds of 0.02 mm "solid" bands. Output
+that is obviously noise is a gift — the dangerous version is the one that returns
+something plausible.
+
+### Artwork scales; hardware does not
+
+The offer was "I can scale in the slicer if you like." Taking it would have dragged the
+keyring pocket from 4.0 mm to 4.5 mm and the plate from 5.0 mm to 5.6 mm going from
+50 mm to 56 mm. A split ring is the same wire whatever the logo measures. So `K` became
+a per-product value derived from the silhouette's own bounding box, and every mount
+dimension is stored in **millimetres** and converted at draw time.
+
+### Read the thumbnails inside the 3mf
+
+Three reference files arrived at once. The fastest ground truth was not the geometry —
+it was `Metadata/plate_1.png` inside the `.3mf`, which the slicer had already rendered.
+Two seconds of looking settled that the pendant uses a protruding ring loop rather than
+the internalised slot. (`Expand-Archive` refuses a `.3mf` extension; copy to `.zip`
+first.)
+
+### Stacked shells must be checked one at a time
+
+The plate is now three extrusions stacked face to face. Checked as one merged soup, the
+shared faces get counted twice and the manifold test reports a leak that isn't there.
+Each shell is checked separately — the same idiom `amscap`'s two-shell gray part
+already used.
 
 ---
 
@@ -272,10 +364,12 @@ Most of the pipeline is logo-agnostic. Expect to change:
 1. `lib-color.js` — the hue thresholds, derived from that logo's palette
 2. `3-measure-ball.js` / `3b-fit-rings.js` — specific to a baseball; drop or replace
 3. `4-build-svg.js` — the assembly and z-order
-4. `8-build-stl.js` — the `BALL` union, the keyring positions, `SIZE_MM`
+4. `8-build-stl.js` — the `BALL` union and the `PRODUCTS` table
 
 Reusable as-is: `lib-curve.js`, `lib-mesh.js`, `7-analyze-print.js`, `9-preview-stl.js`,
-and the whole render-then-contour approach.
+the mount geometry, `verify-slot.js`, and the whole render-then-contour approach. The
+mount in particular carries over unchanged: it finds its own balance point, fits its own
+edge slope, and reports its own openings.
 
 **Start with `7-analyze-print.js`.** Finding the disconnected-piece problem before
 building any geometry saved rebuilding everything.
@@ -284,13 +378,17 @@ building any geometry saved rebuilding everything.
 
 ## Open items
 
-- Height and overall proportions — `SIZE_MM`, `PLATE_H`, `RELIEF_H` at the top of
-  `8-build-stl.js`
+- Thickness. The keychain is 5.6 mm total against Issaquah's 9.0 mm (6.0 base + 3.0
+  raised). 5 mm of base is what was asked for; matching Issaquah outright is a
+  `plateH` / `reliefH` change in `PRODUCTS`
 - A new attachment concept to evaluate; `applyKeyring` dispatches on a mode string, so
-  it is one branch plus an `OPTIONS` entry, and the manifold, hang-angle and load-path
+  it is one branch plus a `PRODUCTS` entry, and the manifold, hang-angle and load-path
   reporting apply automatically
-- `toptab-half` chosen but not yet printed
+- Neither the 56 mm keychain nor either pendant has been printed yet. The 50 mm
+  keychain has, and came out well
+- The pendants are large prints; at 15 mm thick they are also heavy, and the 18.4 mm
+  chord at the chain loop has not been load-checked against a real chain
 - `5-export-layers.js` fit params never retuned; `layers/gray.svg` is heavier than its
   siblings
-- Watertightness is verified for every variant. **Printability is only verified for
-  `amscap-none` at 50 mm.**
+- Watertightness is verified for every product and style. **Printability is only
+  verified for `amscap` at 50 mm.**

@@ -1,11 +1,21 @@
 # Dependencies
 node_modules/
 
+# Climate Pledge Arena model. Working area, deliberately not committed for now.
+cpa-model/
+
 # Generated STLs. Every file is reproduced byte-for-byte by `node 8-build-stl.js`,
-# and a rebuild replaces all 45 of them at once, so keeping them here would add
-# ~47 MB to history on every iteration. `build/` is kept deliberately: it is only
-# ~1.4 MB and the READMEs cite those images as evidence.
+# and a rebuild replaces all of them at once, so keeping them here would add
+# tens of MB to history on every iteration. `build/` and `preview/` are kept
+# deliberately: together they are ~2 MB and the READMEs cite those images as evidence.
 dragons-logo/stl/
+
+# Renders of reference STLs that live outside the repo (previous Issaquah keychains,
+# the Mariners plaque). They are working notes, they cannot be regenerated from a
+# clone, and they depict other organisations' marks.
+dragons-logo/preview/iss*
+dragons-logo/preview/mariners*
+dragons-logo/build/iss*
 
 # OS and editor cruft
 Thumbs.db

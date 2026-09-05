@@ -1,4 +1,4 @@
-// Phase 8: build printable STLs from the finished logo.
+﻿// Phase 8: build printable STLs from the finished logo.
 //
 // Two styles, because they solve different problems:
 //
@@ -29,17 +29,63 @@ const SS = 3;           // supersample factor for the render
 const PAD = 60;         // working margin in SVG units, room for a keyring tab
 const W = (S + 2 * PAD) * SS;
 
-const SIZE_MM = 50;
-const K = SIZE_MM / S;  // millimetres per SVG unit
+// Scale is per-product, not global. The artwork scales but the hardware does
+// not: a pendant four times the size of the keychain still hangs on a real
+// chain, and a plate still has to be thick enough to survive a pocket. So
+// millimetre-denominated features are converted through MM at draw time rather
+// than baked in as SVG constants.
+let K = 50 / S;   // millimetres per SVG unit
+let MM = 1 / K;   // SVG units per millimetre
 
 // Ball outer edge = rOuter 134.0 + wOuter 7.0 / 2. Anything inside this radius
 // is baseball, and unioning it into the plate is what stops the face dropping
 // out of the print.
 const BALL = { cx: 297.51, cy: 313.23, r: 137.5 };
 
-const PLATE_H = 2.0;    // backing plate thickness
-const RELIEF_H = 0.6;   // how far the body stands proud in the emboss style
-const FLUSH_H = 2.6;    // total height of the flush multi-material build
+// Thicknesses, also per-product. Set by configure() before anything is drawn.
+let PLATE_H = 5.0;    // solid backing below the face
+let RELIEF_H = 0.6;   // how far the face stands proud, and how deep colour runs
+let FLUSH_H = 5.6;    // total height
+
+/**
+ * What actually gets built.
+ *
+ * `sizeMm` is pinned to a named axis because the two products were specified
+ * differently and the logo is landscape: the keychain was asked for by height,
+ * the pendant by width. Anchoring each to the axis it was specified on avoids a
+ * silent aspect-ratio mistake.
+ *
+ * Measured off the references: the Issaquah keychain is a 6.0mm base with a
+ * 3.0mm raised layer; its pendant, as placed in "Issaquah (3).3mf", is 70.8 x
+ * 222.4mm with the top layer 15mm thick, and the Mariners concept is 12.8mm.
+ */
+const PRODUCTS = [
+  {
+    name: 'keychain-56mm',
+    axis: 'h', sizeMm: 56,
+    plateH: 5.0, reliefH: 0.6,
+    mount: 'slot',
+    styles: ['emboss', 'amscap'],
+  },
+  {
+    name: 'pendant-223mm-flush',
+    axis: 'w', sizeMm: 223,
+    plateH: 14.4, reliefH: 0.6,   // 15.0mm total, colour only in the top 0.6
+    mount: 'ring',
+    styles: ['amscap'],
+  },
+  {
+    name: 'pendant-223mm-tiered',
+    axis: 'w', sizeMm: 223,
+    plateH: 11.4, reliefH: 0.6,
+    mount: 'ring',
+    styles: ['tiered'],
+    // Lowest to highest, back of the image to front: the gray keyline is the
+    // frame, the ball sits inside it, the seams sit on the ball, and the dragon
+    // stands in front of all of it. Heights are above the base plate.
+    tiers: { gray: 0.0, white: 1.2, red: 2.4, green: 3.6 },
+  },
+];
 
 // Keyring geometry, in SVG units (1 unit = 0.0833mm at 50mm wide). All options
 // use a 3mm hole, which clears the 1.5mm wire of a standard split ring.
@@ -52,6 +98,20 @@ const TAB = { x: 22, y: 247, r: 40, hole: 18 };   // lug off the left edge
 // sinks into the back, which sets the width of that joint. The flare is cut back
 // to clear it, and `trim` is how far right that cut runs.
 const TOPTAB = { r: 42, hole: 18, embed: 22, trim: { half: 350, short: 372 } };
+
+// Internalised mount, copied off the Issaquah keychain rather than invented.
+// Decoded from "Copy of Issaquah.stl": a half-disc pocket of radius exactly
+// 4.0mm centred on the outer edge, with a 2.0 x 1.4mm bar across its mouth for
+// the split ring to loop around, buried under 1.0mm of solid above and below.
+// Nothing protrudes, so the drawn outline is left completely intact.
+//
+// Every figure is in millimetres and converted at draw time, because a keyring
+// is the same size whatever the logo is scaled to.
+const SLOT = { r: 4.0, barW: 2.0, barD: 1.4, wall: 1.0 };
+
+// Pendant mount: a real protruding loop, as both references use. A 12mm hole
+// takes a heavy curb chain, which the 6mm slot channel could never do.
+const RING = { outer: 11.0, hole: 6.0, embed: 5.0 };
 
 
 const toMask = (x, y) => [(x + PAD) * SS, (y + PAD) * SS];
@@ -273,6 +333,17 @@ async function renderMasks() {
 }
 
 /**
+ * The x a mount has to sit on for the piece to hang the way the logo is drawn.
+ *
+ * A hanging part rotates until its area centroid is directly below the pivot,
+ * so this is simply the centroid's own x - not the middle of the ball, which is
+ * 36 units to the right of it and tips the keychain about 14 degrees over.
+ */
+function balanceX(plate) {
+  return centroid(plate)[0];
+}
+
+/**
  * Apply a keyring option. Returns the modified masks plus the hole centre, so
  * the hang angle can be checked against the finished footprint.
  *
@@ -310,7 +381,107 @@ function applyKeyring(masks, mode) {
     return { masks: out, hole: [cx, y], dropped };
   }
 
+  if (mode === 'slot') {
+    // Nothing is added to the outline and nothing is cut through it: the pocket
+    // is a void buried in the middle of the plate's thickness, so the plan masks
+    // are returned untouched and only the z-banded plate build knows about it.
+    // That is the whole point of the internalised mount - unlike every lug
+    // option above, the drawn silhouette survives intact, flare and all.
+    const cx = balanceX(out.plate);
+    const edge = bodyTop(out.plate, cx);
+    const slot = slotMasks(out.plate, cx, edge);
+    // The ring bears on the outer face of the bar, which is the chord through
+    // the pocket centre, so that point is the pivot the piece hangs from.
+    return { masks: out, hole: [cx, edge], slot };
+  }
+
+  if (mode === 'ring') {
+    // A real protruding loop for a chain. Sitting it on the balance line keeps
+    // the hang level, and because the lug is a disc centred on that same line
+    // the material it adds is symmetric about it, so the balance survives.
+    const cx = balanceX(out.plate);
+    const edge = bodyTop(out.plate, cx);
+    const r = RING.outer * MM;
+    const cy = edge - r + RING.embed * MM;
+    addLug(out, cx, cy, r, RING.hole * MM);
+    return { masks: out, hole: [cx, cy] };
+  }
+
   throw new Error(`unknown keyring mode: ${mode}`);
+}
+
+/**
+ * Local slope of the back edge, as dy/dx in SVG units.
+ *
+ * Issaquah's mount sits on the flat top of a letter, so an axis-aligned bar
+ * lands square in the mouth. The dragon's back slopes about 24 degrees where
+ * the balance point falls, and an axis-aligned bar there sits off-centre in the
+ * opening - measured 1.46mm one side against 2.94mm the other. Fitting the
+ * edge and turning the bar to match puts it back in the middle.
+ */
+function edgeSlope(plate, cx, r) {
+  const xs = [], ys = [];
+  for (let d = -r; d <= r; d += r / 8) {
+    const y = bodyTop(plate, cx + d);
+    if (y === null || !isFinite(y)) continue;
+    xs.push(cx + d); ys.push(y);
+  }
+  if (xs.length < 3) return 0;
+  const n = xs.length;
+  const mx = xs.reduce((a, b) => a + b, 0) / n;
+  const my = ys.reduce((a, b) => a + b, 0) / n;
+  let num = 0, den = 0;
+  for (let i = 0; i < n; i++) { num += (xs[i] - mx) * (ys[i] - my); den += (xs[i] - mx) ** 2; }
+  return den === 0 ? 0 : num / den;
+}
+
+/** Rectangle turned to an arbitrary direction. `u` points into the material. */
+function rotRect(mask, cx, cy, ux, uy, halfW, from, to, value) {
+  const reach = Math.max(Math.abs(from), Math.abs(to)) + halfW;
+  const x0 = Math.floor(cx - reach), x1 = Math.ceil(cx + reach);
+  const y0 = Math.floor(cy - reach), y1 = Math.ceil(cy + reach);
+  for (let y = y0; y <= y1; y += 1 / SS) {
+    for (let x = x0; x <= x1; x += 1 / SS) {
+      const dx = x - cx, dy = y - cy;
+      const along = dx * ux + dy * uy;
+      const across = dx * -uy + dy * ux;
+      if (along < from || along > to || Math.abs(across) > halfW) continue;
+      const [mxp, myp] = toMask(x, y);
+      const ix = Math.round(mxp), iy = Math.round(myp);
+      if (ix >= 0 && ix < W && iy >= 0 && iy < W) mask[iy * W + ix] = value;
+    }
+  }
+}
+
+/**
+ * Pocket and bar for the internalised mount, as plan masks.
+ *
+ * The pocket is a full disc centred on the silhouette edge; the half that falls
+ * outside the plate is simply not material, and that is what opens the mouth.
+ * Because the disc is centred on the edge, the chord it opens along is the edge
+ * itself, so turning the bar to lie across that chord divides the mouth evenly
+ * however the back happens to slope.
+ *
+ * Both masks are clipped to the original footprint, so the bar can never stand
+ * proud of the silhouette however the edge curves across its width.
+ */
+function slotMasks(plate, cx, edgeY) {
+  const r = SLOT.r * MM;
+  const pocket = new Uint8Array(W * W);
+  disc(pocket, cx, edgeY, r, 1);
+
+  // Inward normal to the edge. SVG counts y downward, so +y is into the body.
+  const m = edgeSlope(plate, cx, r);
+  const L = Math.hypot(1, m);
+  const ux = -m / L, uy = 1 / L;
+
+  const bar = new Uint8Array(W * W);
+  rotRect(bar, cx, edgeY, ux, uy, (SLOT.barW * MM) / 2, -r, SLOT.barD * MM, 1);
+
+  for (let i = 0; i < W * W; i++) {
+    if (!plate[i]) { pocket[i] = 0; bar[i] = 0; }
+  }
+  return { pocket, bar, slope: m };
 }
 
 /** Merge a lug into the plate, coloured gray so it reads as part of the outline. */
@@ -335,6 +506,41 @@ function solidFor(mask, z0, z1) {
   return mesh.extrude(mesh.buildPolygons(loops), z0, z1, xform);
 }
 
+/**
+ * The plate between z0 and z1, split into bands when it carries a slot mount.
+ *
+ * The pocket has to be a void in the middle of the thickness, solid above and
+ * below, or it would show on the face. Three extrusions stacked face to face
+ * give exactly that. The bar becomes an island in the middle band - separated
+ * from the plate in plan, but joined to the floor and roof it is sandwiched
+ * between - which is precisely how the Issaquah file is put together.
+ */
+function plateSolids(mask, slot, z0, z1) {
+  if (!slot) return [solidFor(mask, z0, z1)];
+  const mid = Uint8Array.from(mask);
+  for (let i = 0; i < W * W; i++) {
+    if (slot.pocket[i]) mid[i] = 0;
+    if (slot.bar[i]) mid[i] = 1;
+  }
+  return [
+    solidFor(mask, z0, z0 + SLOT.wall),
+    solidFor(mid, z0 + SLOT.wall, z1 - SLOT.wall),
+    solidFor(mask, z1 - SLOT.wall, z1),
+  ];
+}
+
+/** Footprint of a mask in SVG units, used to pin a product to a target size. */
+function footprintUnits(mask) {
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (let i = 0; i < W * W; i++) {
+    if (!mask[i]) continue;
+    const x = i % W, y = (i / W) | 0;
+    if (x < x0) x0 = x; if (x > x1) x1 = x;
+    if (y < y0) y0 = y; if (y > y1) y1 = y;
+  }
+  return { w: (x1 - x0) / SS, h: (y1 - y0) / SS };
+}
+
 function recenter(tris) {
   let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
   for (const t of tris) for (const p of t) {
@@ -343,137 +549,166 @@ function recenter(tris) {
   }
   const dx = (minX + maxX) / 2, dy = (minY + maxY) / 2;
   for (const t of tris) for (const p of t) { p[0] -= dx; p[1] -= dy; }
-  return { w: maxX - minX, h: maxY - minY };
+  return { w: maxX - minX, h: maxY - minY, dx, dy };
+}
+
+/** Point the module's scale and thickness at one product before drawing it. */
+function configure(p, fp) {
+  K = p.sizeMm / (p.axis === 'w' ? fp.w : fp.h);
+  MM = 1 / K;
+  PLATE_H = p.plateH;
+  RELIEF_H = p.reliefH;
+  FLUSH_H = PLATE_H + RELIEF_H;
+}
+
+/** Write one named part, checking each shell separately. */
+function writePart(dir, name, shells) {
+  const tris = shells.flat();
+  const f = path.join(dir, `${name}.stl`);
+  mesh.writeBinarySTL(tris, f);
+  // Stacked shells share a face where they meet, so a check over the merged
+  // soup would double count those edges and report a leak that is not there.
+  const bad = shells.reduce((a, s) => a + mesh.checkManifold(s).bad, 0);
+  console.log(`     ${(name + '.stl').padEnd(12)} ${String(tris.length).padStart(7)} tris, open edges: ${bad}`);
+  return { tris: tris.length, bad };
 }
 
 (async () => {
   if (require.main !== module) return;
   const base = await renderMasks();
+  const fp = footprintUnits(base.plate);
 
-  const px2 = (SS * SS);
-  console.log(`Render ${W}x${W}px, ${SIZE_MM}mm wide, 1px = ${(K / SS).toFixed(4)}mm`);
   const plateParts = components(base.plate);
-  console.log(`Plate footprint: ${plateParts.length} piece(s)` +
+  console.log(`Render ${W}x${W}px. Footprint ${fp.w.toFixed(1)} x ${fp.h.toFixed(1)} SVG units ` +
+    `(aspect ${(fp.w / fp.h).toFixed(3)}:1, landscape)`);
+  console.log(`Plate: ${plateParts.length} piece(s)` +
     (plateParts.length === 1 ? '  (connected - the ball is held)' : '  !! still detached'));
-  console.log();
 
-  const OPTIONS = ['none', 'winghole', 'tab', 'toptab-half', 'toptab-short'];
+  for (const p of PRODUCTS) {
+    configure(p, fp);
+    const total = PLATE_H + (p.tiers ? Math.max(...Object.values(p.tiers)) : RELIEF_H);
 
-  for (const keyring of OPTIONS) {
-    const { masks: m, hole, dropped } = applyKeyring(base, keyring);
+    console.log(`\n${'='.repeat(72)}\n${p.name}`);
+    console.log(`  ${(fp.w * K).toFixed(1)} x ${(fp.h * K).toFixed(1)} mm artwork ` +
+      `(pinned by ${p.axis === 'w' ? 'width' : 'height'} to ${p.sizeMm}mm), ` +
+      `${total.toFixed(1)}mm thick`);
+    console.log(`  1 SVG unit = ${K.toFixed(4)} mm`);
+
+    const { masks: m, hole, slot } = applyKeyring(base, p.mount);
     const parts = components(m.plate);
-    const debris = dropped && dropped.length
-      ? `\n   trim dropped ${dropped.length} loose piece(s): ${dropped.map((a) => a.toFixed(1)).join(', ')} sq units`
-      : '';
+    if (parts.length !== 1) console.log(`  !! plate split into ${parts.length} pieces`);
 
-    // A hanging part rotates until its centroid is directly below the pivot,
-    // so this is the angle the logo will actually sit at on a keyring.
-    let hang = '';
+    // A hanging part rotates until its centroid sits directly below the pivot,
+    // so this is the angle it will actually sit at on a ring.
     if (hole) {
       const [cx, cy] = centroid(m.plate);
       const deg = Math.atan2(cx - hole[0], cy - hole[1]) * 180 / Math.PI;
-      hang = `, hangs ${Math.abs(deg) < 0.05 ? 'level' : `${deg.toFixed(1)}deg off upright`}`;
+      console.log(`  hangs ${Math.abs(deg) < 0.05 ? 'level' : `${deg.toFixed(1)}deg off upright`}`);
     }
-    // For a top lug the load runs from the hole down into the dragon's back, so
-    // report the narrowest row across that span and what it survives. PLA breaks
-    // near 50 MPa; layer lines and stress risers make the real figure lower, so
-    // this is an upper bound, not a promise.
-    let load = '';
-    if (keyring.startsWith('toptab')) {
-      const [hx, hy] = hole;
-      const lp = jointWidth(m.plate, hx - TOPTAB.r, hx + TOPTAB.r, hy - TOPTAB.hole, hy + TOPTAB.r);
-      const area = lp.mm * (PLATE_H + RELIEF_H);
-      load = `\n   load path ${lp.mm.toFixed(2)}mm wide at y=${lp.at}` +
-        `, ${area.toFixed(1)}mm^2, breaks near ${(area * 50 / 9.81).toFixed(1)}kg`;
-    }
-    console.log(`== ${keyring}${hang}${load}${debris}` +
-      (parts.length === 1 ? '' : `   !! plate split into ${parts.length} pieces`));
 
-    // --- emboss: one solid part -----------------------------------------
-    {
-      const dir = path.join('stl', `emboss-${keyring}`);
+    if (p.mount === 'slot') {
+      const chan = PLATE_H - 2 * SLOT.wall;
+      // The bar is not a beam spanning the mouth - it is a post, joined to the
+      // solid floor below it and the solid roof above it. A ring pulling on it
+      // therefore shears those two bonds, and since the part prints flat the
+      // load runs along the layers rather than trying to peel them apart.
+      const shear = 2 * SLOT.barW * SLOT.barD;
+      const gap = (2 * SLOT.r - SLOT.barW) / 2;
+      console.log(`  slot mount: r${SLOT.r}mm pocket, ${chan.toFixed(1)}mm channel, ` +
+        `post ${SLOT.barW} x ${SLOT.barD}mm, ${SLOT.wall}mm floor and roof`);
+      console.log(`  edge slope ${(Math.atan(slot.slope) * 180 / Math.PI).toFixed(1)}deg, ` +
+        `bar turned to match: ${gap.toFixed(2)}mm opening each side of the post`);
+      console.log(`  post joins floor and roof over ${shear.toFixed(1)}mm2 in shear ` +
+        `(order of 30MPa along the layers)`);
+    }
+    if (p.mount === 'ring') {
+      // Where the loop meets the back, the two circles cut a chord: that width
+      // is the whole load path, so it is the number worth knowing.
+      const chord = 2 * Math.sqrt(RING.outer ** 2 - (RING.outer - RING.embed) ** 2);
+      console.log(`  chain loop: ${(RING.outer * 2)}mm across, ${(RING.hole * 2)}mm hole, ` +
+        `${(RING.outer - RING.hole).toFixed(1)}mm ring wall`);
+      console.log(`  sunk ${RING.embed}mm into the back, joining it over a ${chord.toFixed(1)}mm chord`);
+    }
+
+    for (const style of p.styles) {
+      const dir = path.join('stl', p.name, style);
       fs.mkdirSync(dir, { recursive: true });
-      const solids = {
-        plate: solidFor(m.plate, 0, PLATE_H),
-        green: solidFor(m.green, PLATE_H, PLATE_H + RELIEF_H),
-        red: solidFor(m.red, PLATE_H, PLATE_H + RELIEF_H),
-      };
-      // Each solid is checked on its own. Where the keyring hole passes through
-      // both the plate and the relief above it, the two share an identical wall,
-      // so a check over the merged triangle soup double counts those edges and
-      // reports a leak that isn't there.
-      const bad = Object.entries(solids)
-        .map(([n, t]) => [n, mesh.checkManifold(t).bad])
-        .filter(([, b]) => b > 0);
+      console.log(`\n   ${style}:`);
 
-      const tris = [...solids.plate, ...solids.green, ...solids.red];
-      const size = recenter(tris);
-      const f = path.join(dir, 'dragons-keychain.stl');
-      mesh.writeBinarySTL(tris, f);
-      console.log(`${f}`);
-      console.log(`   ${tris.length} triangles, ${size.w.toFixed(1)} x ${size.h.toFixed(1)} x ${(PLATE_H + RELIEF_H).toFixed(1)} mm` +
-        `, open edges: ${bad.length ? bad.map(([n, b]) => `${n}=${b}`).join(' ') : '0 (all 3 solids closed)'}`);
-    }
-
-    // --- ams: one STL per colour, flush face ------------------------------
-    {
-      const dir = path.join('stl', `ams-${keyring}`);
-      fs.mkdirSync(dir, { recursive: true });
-      const all = [];
-      const per = {};
-      for (const name of ['gray', 'green', 'red', 'white']) {
-        per[name] = solidFor(m[name], 0, FLUSH_H);
-        all.push(...per[name].map((t) => t.map((p) => p.slice())));
+      let per;
+      if (style === 'emboss') {
+        // One solid part: plate plus whatever stands proud of it.
+        per = {
+          plate: plateSolids(m.plate, slot, 0, PLATE_H),
+          green: [solidFor(m.green, PLATE_H, FLUSH_H)],
+          red: [solidFor(m.red, PLATE_H, FLUSH_H)],
+        };
+      } else if (style === 'amscap') {
+        // Flush face, colour only in the top RELIEF_H. Everything below is one
+        // filament, so the tool changes and the purge that goes with them are
+        // confined to a few layers and nothing is lost - the material saved was
+        // buried where it could never be seen.
+        per = {
+          gray: [...plateSolids(m.plate, slot, 0, PLATE_H), solidFor(m.gray, PLATE_H, FLUSH_H)],
+          green: [solidFor(m.green, PLATE_H, FLUSH_H)],
+          red: [solidFor(m.red, PLATE_H, FLUSH_H)],
+          white: [solidFor(m.white, PLATE_H, FLUSH_H)],
+        };
+      } else if (style === 'tiered') {
+        // Each colour rises to its own height above a common base, back of the
+        // image to front. Gray sits at the base top, so it needs no riser.
+        const t = p.tiers;
+        per = { gray: plateSolids(m.plate, slot, 0, PLATE_H) };
+        for (const name of ['white', 'red', 'green']) {
+          per[name] = [solidFor(m[name], PLATE_H, PLATE_H + t[name])];
+        }
+        if (t.gray > 0) per.gray.push(solidFor(m.gray, PLATE_H, PLATE_H + t.gray));
+      } else {
+        throw new Error(`unknown style: ${style}`);
       }
-      // Centre every colour by the same offset so the parts still line up.
-      const flat = [];
-      for (const name of Object.keys(per)) flat.push(...per[name]);
-      const size = recenter(flat);
-      let total = 0;
-      for (const name of Object.keys(per)) {
-        const f = path.join(dir, `${name}.stl`);
-        mesh.writeBinarySTL(per[name], f);
-        const chk = mesh.checkManifold(per[name]);
-        total += per[name].length;
-        console.log(`   ${f.padEnd(34)} ${String(per[name].length).padStart(6)} tris, open edges: ${chk.bad}`);
-      }
-      console.log(`   ${dir}: ${total} triangles, ${size.w.toFixed(1)} x ${size.h.toFixed(1)} x ${FLUSH_H} mm`);
-    }
-    // --- ams-cap: colour only in the top layers, gray below ---------------
-    // Same flush face as `ams`, but the colours stop after RELIEF_H and gray
-    // fills the rest. Only those top layers contain more than one filament, so
-    // the tool changes and the purge that goes with them drop by about 4x, and
-    // nothing is lost: the material saved was buried where it is never seen.
-    {
-      const dir = path.join('stl', `amscap-${keyring}`);
-      fs.mkdirSync(dir, { recursive: true });
-      const per = {
-        gray: [solidFor(m.plate, 0, PLATE_H), solidFor(m.gray, PLATE_H, FLUSH_H)],
-        green: [solidFor(m.green, PLATE_H, FLUSH_H)],
-        red: [solidFor(m.red, PLATE_H, FLUSH_H)],
-        white: [solidFor(m.white, PLATE_H, FLUSH_H)],
-      };
+
       // Centre every colour by the same offset so the parts still line up.
       const flat = [];
       for (const shells of Object.values(per)) for (const s of shells) flat.push(...s);
       const size = recenter(flat);
-      let total = 0;
+
+      let tris = 0, bad = 0;
       for (const [name, shells] of Object.entries(per)) {
-        const tris = shells.flat();
-        const f = path.join(dir, `${name}.stl`);
-        mesh.writeBinarySTL(tris, f);
-        // Gray is two shells stacked, so they are checked one at a time; merged
-        // they would share the face at PLATE_H and double count its edges.
-        const bad = shells.map((s) => mesh.checkManifold(s).bad).reduce((a, b) => a + b, 0);
-        total += tris.length;
-        console.log(`   ${f.padEnd(34)} ${String(tris.length).padStart(6)} tris, open edges: ${bad}`);
+        const r = writePart(dir, name, shells);
+        tris += r.tris; bad += r.bad;
       }
-      const layers = Math.round(RELIEF_H / 0.2);
-      console.log(`   ${dir}: ${total} triangles, ${size.w.toFixed(1)} x ${size.h.toFixed(1)} x ${FLUSH_H} mm` +
-        `, colour in the top ${layers} layers only (${RELIEF_H} mm at 0.2)`);
+
+      if (style === 'emboss') {
+        // Also ship it as a single file, since it is one material anyway.
+        mesh.writeBinarySTL(flat, path.join(dir, 'dragons-combined.stl'));
+      }
+      if (style === 'tiered') {
+        const t = p.tiers;
+        console.log(`     steps above the ${PLATE_H}mm base: ` +
+          Object.entries(t).sort((a, b) => a[1] - b[1])
+            .map(([n, v]) => `${n} +${v.toFixed(1)}`).join('  ->  '));
+      }
+
+      // Record where the mount ended up so a section can be cut through it
+      // without guessing. The plate is recentred after it is built, so this is
+      // the only point at which the mount's final coordinates are known.
+      fs.writeFileSync(path.join(dir, 'manifest.json'), JSON.stringify({
+        product: p.name, style, mount: p.mount,
+        mountXY: hole ? [hole[0] * K - size.dx, (S - hole[1]) * K - size.dy] : null,
+        sizeMm: [+size.w.toFixed(2), +size.h.toFixed(2), +total.toFixed(2)],
+        plateH: PLATE_H, reliefH: RELIEF_H,
+        slot: p.mount === 'slot' ? { ...SLOT, slopeDeg: +(Math.atan(slot.slope) * 180 / Math.PI).toFixed(2) } : null,
+        ring: p.mount === 'ring' ? RING : null,
+        tiers: p.tiers || null,
+        parts: Object.keys(per),
+      }, null, 2));
+
+      console.log(`     ${dir}: ${tris} triangles, ` +
+        `${size.w.toFixed(1)} x ${size.h.toFixed(1)} x ${total.toFixed(1)} mm` +
+        (bad ? `,  !! ${bad} open edges` : ',  all shells closed'));
     }
-    console.log();
   }
+  console.log();
 })();
 
-module.exports = { renderMasks, applyKeyring, xform, W, SS, PAD, S, K, columnRuns, jointWidth, centroid };
+module.exports = { renderMasks, applyKeyring, xform, W, SS, PAD, S, columnRuns, jointWidth, centroid, footprintUnits };
