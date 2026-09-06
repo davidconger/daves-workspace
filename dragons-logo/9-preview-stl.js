@@ -241,10 +241,17 @@ function loadStyle(dir) {
       }
       if (man.mount === 'ring' && body && man.mountXY) {
         const [mx, my] = man.mountXY;
-        const half = man.ring.outer * 2.0;
+        const half = man.ring.outer * 1.6;
         panels.push({
           label: `chain loop detail  (${(half * 2).toFixed(0)}mm wide)`,
           img: render(parts, { pitch: 0, fit: [mx - half, mx + half, my - half, my + half] }),
+        });
+        // Wide enough to take in the flare sweeping back off the head, which is
+        // the thing the chain would foul if the trim were not far enough back.
+        const w = man.ring.outer * 3.4;
+        panels.push({
+          label: 'loop and flare clearance',
+          img: render(parts, { pitch: 0, fit: [mx - w * 0.45, mx + w * 1.55, my - w * 0.7, my + w * 1.3] }),
         });
       }
     }

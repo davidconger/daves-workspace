@@ -16,6 +16,11 @@ dragons-logo/stl/
 dragons-logo/preview/iss*
 dragons-logo/preview/mariners*
 dragons-logo/build/iss*
+dragons-logo/build/ref/
+
+# Section dumps from `measure-loop.js`. Named after whatever mesh was being
+# probed at the time, regenerated on demand, and only meaningful mid-diagnosis.
+dragons-logo/build/sec-*
 
 # OS and editor cruft
 Thumbs.db

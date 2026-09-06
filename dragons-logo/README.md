@@ -168,8 +168,12 @@ stl/pendant-223mm-tiered/tiered/{gray,white,red,green}.stl
 | Product | Size | Thick | Mount |
 |---|---|---|---|
 | `keychain-56mm` | 56 mm tall × 69.5 mm | 5.6 mm | internalised slot |
-| `pendant-223mm-flush` | 223 mm wide × 179.6 mm | 15.0 mm | 22 mm chain loop |
-| `pendant-223mm-tiered` | 223 mm wide × 179.6 mm | 15.0 mm | 22 mm chain loop |
+| `pendant-223mm-flush` | 223 mm wide × 178.3 mm | 15.0 mm | 33 mm chain bail, 23.5 mm hole |
+| `pendant-223mm-tiered` | 223 mm wide × 178.3 mm | 15.0 mm | 33 mm chain bail, 23.5 mm hole |
+
+The pendants measure 178.3 mm rather than the artwork's 179.6 mm because the flare
+sweeping back from the head is cut short to clear the chain; the loop then becomes the
+highest point.
 
 Every shell reports **0 open edges**. Each style folder also gets a `manifest.json`
 recording the final size and the mount's coordinates *after* recentring, which is what
@@ -308,11 +312,106 @@ below the edge — ample for an 8 mm pocket.
 
 ### The chain loop
 
-A real protruding loop, as both pendant references use: 22 mm across with a 12 mm hole,
-leaving a 5 mm ring wall, sunk 5 mm into the dragon's back so the two circles cut an
-**18.4 mm chord** where they merge. That chord is the entire load path. A 6 mm slot
-channel could never take a heavy curb chain, which is why the pendants do not reuse the
-keychain's mount.
+The first version was invented — 22 mm across with a 12 mm hole — and it was wrong twice
+over: too small for the chain actually in use, and sunk in a way that bit a notch out of
+the green band running along the dragon's back. It was replaced by the bail off the
+**Issaquah pendant**, which was sized to that chain, and measured rather than eyeballed.
+
+Finding it took some digging. `Copy of Issaquah.3mf` turned out to be the *keychain*
+plate — 17 copies of the "I", no loop. `Issaquah (3).3mf` has the pendant; its
+`Metadata/top_1.png` thumbnail shows the bail immediately, and its two build items scale
+by 0.56 and 0.59 in XY. `measure-loop.js` slices a mesh at a z-plane, scanline-fills the
+closed section loops, then flood-fills the background so that any pocket which never
+reaches the border is reported as a genuine hole. Run over each object in the 3mf:
+
+| | size (model units) | hole |
+| --- | --- | --- |
+| `object_3.model` object 3 | 140 × 399 × 14 | 42.0 × 30.4, one |
+| `object_6.model` object 6 | 120 × 377 × 15 | none |
+
+399 × 0.56 = 223.4 mm, which is the pendant, so object 3 at 0.56 is the one. Dumping the
+filled section as a PNG shows a rounded arch, and scanning it row by row shows it is
+something simpler — **two exactly concentric circles**, outer r29.5 and inner r21 centred
+9.6 units above the letter's top edge, holding to a tenth of a unit all the way round:
+
+| y | measured half width | circle r29.5 at (0, 170) |
+| --- | --- | --- |
+| 192.7 | 19.0 | 18.8 |
+| 170.0 | 29.4 | 29.5 |
+| 161.5 | 28.2 | 28.2 |
+
+After the 0.56: a **23.5 mm hole in a 4.8 mm wall, 33 mm across**. Like the slot, those
+figures are stored in millimetres and converted at draw time, because a chain is the same
+chain whatever the logo is scaled to.
+
+**One deliberate difference.** Issaquah sinks the *hole* 6.4 mm (scaled) below the
+silhouette edge, so the arch's legs land on the edge and the flat top of the "I" forms
+the hole's floor. Repeating that on the dragon would cut straight through the green,
+because the gray keyline it would have to stay inside is only about **3 mm** deep there.
+So `embed` is set equal to the wall instead, which puts the hole exactly **tangent** to
+the edge. It costs nothing: the opening becomes a full 23.5 mm circle rather than
+Issaquah's 23.5 × 17.0 mm arch — if anything more generous — and the joint into the body
+is still a **23.1 mm chord**.
+
+### The loop grows out from behind the artwork
+
+The original `addLug` painted its disc gray and erased every other colour across the
+whole disc. On a lug hanging off an edge that is invisible; on a loop deliberately sunk
+into the body it erased a lune of green and left a notch in the band along the dragon's
+back. The fix is a `behind` mode that paints gray **only where the plate was empty
+before** and erases nothing, so the green curve carries on unbroken and the loop reads as
+emerging from behind it.
+
+Because the previous build failed at exactly this point, it is now counted rather than
+trusted: the ring branch snapshots every colour mask, and the build prints how much of
+each was lost inside the lug. Anything but zero on a drawn colour is the notch coming
+back.
+
+### The feed slot
+
+A closed ring has to be threaded onto the chain while the chain is open. The Issaquah
+bail is not closed — it is **split at 12 o'clock**, so a link can be fed in sideways. The
+first pass here missed that and copied the ring as a plain annulus.
+
+The split announced itself as an *absence*. Running the hole finder across all 21
+Issaquah STLs, `Issaquah (14).stl` is dimensionally identical to `(6)` and `(9)` —
+120 × 377 × 15 — but reports **zero enclosed holes**, because the cut lets the flood fill
+escape. `(10)` and `(11)` are the bail on its own, 59 × 59 × 8 mm, and differ from each
+other the same way. "No hole" was the measurement.
+
+Sectioning at successive z-planes showed a radial cut centred on the ring's centre line
+but could not explain its shape, because **the profile varies through the thickness** and
+every section was taken across it. `measure-loop.js` gained an `AXIS` option that
+permutes the coordinates so the same code can cut edge-on, and the answer was immediate:
+the two ends are each chamfered to a point at mid-depth, so the gap is an **hourglass**.
+Measured at the wall, in model units:
+
+| z | 14.50 | 15.57 | 16.64 | **17.71** | 18.79 | 19.86 | 20.93 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| gap | 9.20 | 6.80 | 4.80 | **2.40** | 3.60 | 5.60 | 8.00 |
+
+Both branches are straight and meet exactly at the middle, so it is a true V rather than
+a channel: **6.0 mm at each face, pinching to a 1.42 mm throat**. A link is sprung past
+the throat and then cannot fall back out.
+
+**What gets copied is the mouth and the throat, not the angle.** Those two numbers are
+what a link has to pass, and they are proven against the chain he actually uses. The
+reference achieves them across an 8 mm ring; ours is the full 15 mm, so holding the
+*angle* instead would force a mouth of about 10 mm on a 33 mm ring. Keeping the
+dimensions and letting the angle fall out gives 17° here against the reference's 30°,
+which only means a longer, gentler funnel.
+
+Implementing it needs geometry rather than a mask, since a plan mask has no way to say
+"narrower in the middle". The slot is cut at its full mouth width in every colour mask,
+and two triangular prisms are added back, tapering to the throat at mid-depth. They are
+deliberately sunk 0.8 mm into the ring: a slicer welds an overlap reliably, whereas two
+exactly coincident faces are a coin toss.
+
+Measured back off the finished mesh, which is the only thing that counts:
+
+| depth (mm) | 1.6 | 3.1 | 4.5 | 6.0 | **7.5** | 9.0 | 10.5 | 11.9 | 13.4 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| gap (mm) | 6.15 | 5.10 | 3.90 | 2.60 | **1.40** | 2.60 | 3.90 | 5.10 | 6.15 |
 
 ### Where the top lug goes, and why the flare gets cut
 
@@ -331,6 +430,23 @@ thin enough to be flare. Past the cut point the removal eases off over 40 units,
 material from the *lower* edge so the upper sweep carries through to a point. A flat
 chop reads as damage; a taper reads as the original artwork, which converges the same
 way.
+
+The pendants need the same cut, for a blunter reason: the loop lands on the edge at
+x = 261 and the untrimmed flare runs out to x = 255, straight over the top of it, so a
+chain through the hole would foul it. Scanning the render for where the neighbouring
+features end gives the number to cut to:
+
+| feature | leftmost x |
+| --- | --- |
+| flare, untrimmed | 255 |
+| lower spike | 343 |
+| upper spike | 357 |
+
+Cutting to **322** leaves the flare reaching about 20 units — 8 mm at pendant scale —
+past the nearer spike, which is the "little bit further" it reads as in the drawing, and
+clears the loop by a wide margin. The trim sweeps up two fragments of 0.08 mm², which is
+grid dust rather than anything real; the build prints their area so a cut that severed
+something would show as a figure far too large to be a speck.
 
 **A hanging part rotates until its centroid is under the pivot.** The centroid sits at
 x = 261, about 3 mm left of the ball centre at x = 298, so the top lug variants hang

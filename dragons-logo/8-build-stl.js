@@ -71,14 +71,14 @@ const PRODUCTS = [
     name: 'pendant-223mm-flush',
     axis: 'w', sizeMm: 223,
     plateH: 14.4, reliefH: 0.6,   // 15.0mm total, colour only in the top 0.6
-    mount: 'ring',
+    mount: 'ring', trim: 322,
     styles: ['amscap'],
   },
   {
     name: 'pendant-223mm-tiered',
     axis: 'w', sizeMm: 223,
     plateH: 11.4, reliefH: 0.6,
-    mount: 'ring',
+    mount: 'ring', trim: 322,
     styles: ['tiered'],
     // Lowest to highest, back of the image to front: the gray keyline is the
     // frame, the ball sits inside it, the seams sit on the ball, and the dragon
@@ -109,9 +109,58 @@ const TOPTAB = { r: 42, hole: 18, embed: 22, trim: { half: 350, short: 372 } };
 // is the same size whatever the logo is scaled to.
 const SLOT = { r: 4.0, barW: 2.0, barD: 1.4, wall: 1.0 };
 
-// Pendant mount: a real protruding loop, as both references use. A 12mm hole
-// takes a heavy curb chain, which the 6mm slot channel could never do.
-const RING = { outer: 11.0, hole: 6.0, embed: 5.0 };
+// Pendant mount: the bail off the Issaquah pendant, measured rather than
+// invented, because that one was sized to the chain actually in use.
+//
+// Decoded from "Issaquah (3).3mf", 3D/Objects/object_3.model object 3, which
+// the build item scales by 0.56 in XY (399 model units -> 223.4mm, matching the
+// pendant it prints as). Sectioning it and flood filling the section shows the
+// bail is two exactly concentric circles centred 9.6 units above the letter's
+// top edge: outer r29.5, inner r21, so a uniform 8.5 wall. Fitted against the
+// measured profile it holds to a tenth of a unit the whole way round:
+//
+//     y      half width   circle r29.5 at (0, 170)
+//     192.7    19.0         18.8
+//     170.0    29.4         29.5
+//     161.5    28.2         28.2
+//
+// In millimetres after the 0.56: a 23.5mm hole in a 4.8mm wall. Absolute, not
+// scaled with the artwork, for the same reason the slot mount is.
+//
+// `embed` is how far the outer circle sinks below the silhouette edge, and it
+// is set equal to the wall so the *hole* lands exactly tangent to that edge.
+// Issaquah sinks the hole 6.4mm (scaled) into the letter, which is fine across
+// the flat bar of an "I" but here would bite a notch out of the green band on
+// the dragon's back - and the gray keyline it would have to stay inside is only
+// about 3mm deep. Tangent costs nothing: the opening is a full 23.5mm circle
+// rather than Issaquah's 23.5 x 17.0mm arch, so it is if anything more
+// generous, and the joint into the body is still a 23.2mm chord.
+const RING = { outer: 16.5, hole: 11.8, embed: 4.7, slot: { mouth: 6.0, throat: 1.4 } };
+
+// The feed slot is what lets a chain link be threaded in instead of the chain
+// having to be opened, and it is the reason the reference ring is not a plain
+// annulus. Measured off "Issaquah (14).stl", which is the same 120 x 377 x 15
+// pendant as (6) and (9) but with the ring split - and which is exactly why the
+// hole finder reported *no* enclosed hole for it while it found one in the
+// others: the split lets the flood fill escape.
+//
+// A radial cut at 12 o'clock, centred on the ring's own centre line to a tenth
+// of a millimetre. Its width is not constant: sectioning along y, edge on to the
+// slot, shows the two ring ends chamfered to a point at mid depth, so the gap is
+// an hourglass. Gap against height, with the ring spanning z 14..22:
+//
+//     z      14.5   15.6   16.6   17.7   18.8   19.9   20.9
+//     gap     9.2    6.8    4.8    2.4    3.6    5.6    8.0     (model units)
+//
+// Both branches are straight and meet at z=17.71 with a 2.40 gap, so it is a
+// true V with a knife-edge throat rather than a channel. In printed millimetres
+// - x and y scale by 0.59, z does not, per the build item transform - that is a
+// 1.4mm throat behind a mouth of about 6mm.
+//
+// Those two figures are copied absolutely. The funnel angle is not: this ring is
+// 15mm thick against the reference's 8mm, so holding the mouth and throat fixed
+// gives a shallower taper. The dimensions a link actually has to pass are the
+// ones that were proven to fit the chain; the angle is whatever falls out.
 
 
 const toMask = (x, y) => [(x + PAD) * SS, (y + PAD) * SS];
@@ -349,8 +398,15 @@ function balanceX(plate) {
  *
  * The top lug variants differ only in how far the flare trailing back from the
  * head is cut away before the lug is merged onto it.
+ *
+ * `trim` does the same for the ring mount. Scanned off the render, the flare
+ * runs out to x=255 while the two spikes below it stop at x=343 and x=357, and
+ * the loop lands on the edge at x=261 - so untrimmed the flare passes straight
+ * over the loop and into the chain. Cutting to 322 leaves the flare reaching
+ * about 20 units past the nearer spike, which is the "little bit further" it
+ * reads as in the drawing, and clears the loop by a wide margin.
  */
-function applyKeyring(masks, mode) {
+function applyKeyring(masks, mode, trim = null) {
   const out = {};
   for (const [k, v] of Object.entries(masks)) out[k] = Uint8Array.from(v);
 
@@ -399,12 +455,44 @@ function applyKeyring(masks, mode) {
     // A real protruding loop for a chain. Sitting it on the balance line keeps
     // the hang level, and because the lug is a disc centred on that same line
     // the material it adds is symmetric about it, so the balance survives.
+    //
+    // The flare goes first, so the column scan reads the original silhouette,
+    // and because on a pendant that flare sweeps back across the top edge right
+    // where the loop lands - and a chain hung there would foul it.
+    const dropped = trim ? trimFlare(out, 200, trim) : [];
     const cx = balanceX(out.plate);
     const edge = bodyTop(out.plate, cx);
     const r = RING.outer * MM;
     const cy = edge - r + RING.embed * MM;
-    addLug(out, cx, cy, r, RING.hole * MM);
-    return { masks: out, hole: [cx, cy] };
+
+    // The whole point of sinking the loop behind the artwork is that no drawn
+    // colour is lost to it, and the previous build failed exactly there. Count
+    // it rather than trust it: any non-zero figure is a notch.
+    const before = {};
+    for (const k of Object.keys(out)) if (k !== 'plate') before[k] = Uint8Array.from(out[k]);
+    addLug(out, cx, cy, r, RING.hole * MM, true);
+    const lost = {};
+    for (const k of Object.keys(before)) {
+      let n = 0;
+      for (let i = 0; i < W * W; i++) if (before[k][i] && !out[k][i]) n++;
+      if (n) lost[k] = n / (SS * SS);
+    }
+
+    // The feed slot, cut at its widest. The funnel that narrows it to the throat
+    // varies through the thickness, which a plan mask cannot express, so it is
+    // added as geometry later; here the slot is simply opened to the mouth width.
+    const hm = (RING.slot.mouth / 2) * MM;
+    const holeR = RING.hole * MM;
+    for (const k of Object.keys(out)) rect(out[k], cx - hm, cy - r - 2, cx + hm, cy, 0);
+    // Stop the funnel short of the outer circle, or its flat outer face would
+    // stand a fraction of a millimetre proud of the ring at the slot's shoulders.
+    const ringSlot = {
+      cx, hm, ht: (RING.slot.throat / 2) * MM,
+      yOuter: cy - Math.sqrt(r * r - hm * hm),
+      yInner: cy - holeR,
+    };
+
+    return { masks: out, hole: [cx, cy], dropped, lost, ringSlot };
   }
 
   throw new Error(`unknown keyring mode: ${mode}`);
@@ -484,12 +572,38 @@ function slotMasks(plate, cx, edgeY) {
   return { pocket, bar, slope: m };
 }
 
-/** Merge a lug into the plate, coloured gray so it reads as part of the outline. */
-function addLug(m, x, y, r, holeR) {
-  disc(m.plate, x, y, r, 1);
-  disc(m.gray, x, y, r, 1);
-  for (const k of Object.keys(m)) {
-    if (k !== 'plate' && k !== 'gray') disc(m[k], x, y, r, 0);
+/**
+ * Merge a lug into the plate, coloured gray so it reads as part of the outline.
+ *
+ * `behind` grows the lug out from behind the artwork instead of on top of it:
+ * gray is painted only where the plate was empty before, and nothing already
+ * drawn is erased. The flat version erases every other colour across the whole
+ * lug disc, which on the pendant bit a notch out of the green band running along
+ * the dragon's back, since the disc is deliberately sunk into the body. Painting
+ * only the new area leaves that curve unbroken and the loop appears to emerge
+ * from behind it.
+ */
+function addLug(m, x, y, r, holeR, behind = false) {
+  if (behind) {
+    const [mx, my] = toMask(x, y);
+    const mr = r * SS;
+    const x0 = Math.max(0, Math.floor(mx - mr)), x1 = Math.min(W - 1, Math.ceil(mx + mr));
+    const y0 = Math.max(0, Math.floor(my - mr)), y1 = Math.min(W - 1, Math.ceil(my + mr));
+    for (let py = y0; py <= y1; py++) {
+      for (let px = x0; px <= x1; px++) {
+        if (Math.hypot(px - mx, py - my) > mr) continue;
+        const s = py * W + px;
+        if (m.plate[s]) continue;
+        m.plate[s] = 1;
+        m.gray[s] = 1;
+      }
+    }
+  } else {
+    disc(m.plate, x, y, r, 1);
+    disc(m.gray, x, y, r, 1);
+    for (const k of Object.keys(m)) {
+      if (k !== 'plate' && k !== 'gray') disc(m[k], x, y, r, 0);
+    }
   }
   for (const k of Object.keys(m)) disc(m[k], x, y, holeR, 0);
 }
@@ -504,6 +618,62 @@ const xform = (p) => [
 function solidFor(mask, z0, z1) {
   const loops = mesh.maskToLoops(mask, W, W, { sigma: 1.2, spacing: 2.5 });
   return mesh.extrude(mesh.buildPolygons(loops), z0, z1, xform);
+}
+
+/**
+ * A closed triangular prism: cross-section (a, b, c) in the x-z plane, extruded
+ * along y between yA and yB. Points are [x, z].
+ *
+ * Which way the winding comes out depends on how the caller happened to order
+ * the cross-section, and a prism built inside out reads to a slicer as a hole
+ * rather than a solid. Signed volume settles it rather than a hand-worked
+ * cross product that is easy to get backwards.
+ */
+function triPrism(a, b, c, yA, yB) {
+  const V = (p, y) => [p[0], y, p[1]];
+  const tris = [
+    [V(a, yB), V(b, yB), V(c, yB)],
+    [V(a, yA), V(c, yA), V(b, yA)],
+  ];
+  for (const [p, q] of [[a, b], [b, c], [c, a]]) {
+    tris.push([V(p, yB), V(q, yA), V(q, yB)]);
+    tris.push([V(p, yB), V(p, yA), V(q, yA)]);
+  }
+  let vol = 0;
+  for (const [p, q, r] of tris) {
+    vol += (p[0] * (q[1] * r[2] - q[2] * r[1])
+      - p[1] * (q[0] * r[2] - q[2] * r[0])
+      + p[2] * (q[0] * r[1] - q[1] * r[0])) / 6;
+  }
+  return vol < 0 ? tris.map((t) => [t[0], t[2], t[1]]) : tris;
+}
+
+/**
+ * The two wedges that turn the straight feed slot into the reference's funnel.
+ *
+ * The slot is already cut to its full mouth width in the plan mask, so what is
+ * missing is material, not a cut - which is fortunate, because adding a solid
+ * needs no boolean. Each wedge is a triangle in the x-z plane: a flat face
+ * against the slot wall running the full thickness, and an apex reaching in to
+ * the throat half-width at mid depth. Extruded across the ring's wall, the pair
+ * leaves exactly the measured hourglass, chamfered to a point at mid depth.
+ *
+ * One shell per wedge, so each is manifold-checked on its own.
+ */
+function funnelWedges(rs, z0, z1) {
+  const zc = (z0 + z1) / 2;
+  const yA = (S - rs.yInner) * K, yB = (S - rs.yOuter) * K;
+  // Bury the flat face well inside the ring rather than landing it on the slot
+  // wall. Two coincident coplanar faces are a coin toss for a slicer's union; a
+  // real intersection is not. It does not alter the opening, which is bounded by
+  // the sloped face and by the slot wall, only where that face starts from.
+  const bite = 0.8;
+  return [-1, 1].map((s) => triPrism(
+    [(rs.cx + s * rs.hm) * K + s * bite, z0],
+    [(rs.cx + s * rs.hm) * K + s * bite, z1],
+    [(rs.cx + s * rs.ht) * K, zc],
+    Math.min(yA, yB), Math.max(yA, yB),
+  ));
 }
 
 /**
@@ -594,9 +764,28 @@ function writePart(dir, name, shells) {
       `${total.toFixed(1)}mm thick`);
     console.log(`  1 SVG unit = ${K.toFixed(4)} mm`);
 
-    const { masks: m, hole, slot } = applyKeyring(base, p.mount);
+    const { masks: m, hole, slot, dropped, lost, ringSlot } = applyKeyring(base, p.mount, p.trim);
     const parts = components(m.plate);
     if (parts.length !== 1) console.log(`  !! plate split into ${parts.length} pieces`);
+    if (p.trim) {
+      // A cut along a curve leaves specks where the tapering tip falls between
+      // samples. Print what was swept up, so a cut that severed something real
+      // shows itself as an area far too big to be a speck.
+      const areas = (dropped || []).map((a) => a * K * K);
+      console.log(`  flare cut back to x=${p.trim} (${(p.trim * K).toFixed(1)}mm from the left edge), ` +
+        (areas.length
+          ? `${areas.length} loose fragment(s) swept up, largest ${Math.max.apply(null, areas).toFixed(2)}mm2`
+          : 'nothing left loose'));
+    }
+    if (lost) {
+      // gray is allowed to lose a sliver where the hole grazes the outline the
+      // loop grows out of; any *drawn* colour going missing is the old notch back.
+      const bad = Object.entries(lost).filter(([k]) => k !== 'gray');
+      console.log(bad.length
+        ? '  !! loop notched the artwork: ' +
+          bad.map(([k, a]) => `${k} -${(a * K * K).toFixed(2)}mm2`).join(', ')
+        : '  loop takes nothing out of the artwork: the green band runs unbroken behind it');
+    }
 
     // A hanging part rotates until its centroid sits directly below the pivot,
     // so this is the angle it will actually sit at on a ring.
@@ -665,6 +854,22 @@ function writePart(dir, name, shells) {
         if (t.gray > 0) per.gray.push(solidFor(m.gray, PLATE_H, PLATE_H + t.gray));
       } else {
         throw new Error(`unknown style: ${style}`);
+      }
+
+      if (ringSlot) {
+        // The funnel has to span the ring's own stack, which is not the same as
+        // the part's overall height: in `tiered` the green stands 3.6mm above
+        // the gray the ring is made of, and a funnel run to the top of that
+        // would hang in mid air above the ring.
+        const ringTop = style === 'emboss' ? PLATE_H
+          : style === 'tiered' ? PLATE_H + p.tiers.gray
+            : FLUSH_H;
+        const part = style === 'emboss' ? 'plate' : 'gray';
+        for (const wedge of funnelWedges(ringSlot, 0, ringTop)) per[part].push(wedge);
+        const f = RING.slot;
+        const deg = Math.atan(((f.mouth - f.throat) / 2) / (ringTop / 2)) * 180 / Math.PI;
+        console.log(`     feed slot: ${f.mouth}mm mouth funnelling to a ${f.throat}mm throat ` +
+          `at mid-depth of ${ringTop.toFixed(1)}mm (${deg.toFixed(0)}deg each face)`);
       }
 
       // Centre every colour by the same offset so the parts still line up.

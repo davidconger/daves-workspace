@@ -6,8 +6,9 @@ was tried, what turned out to be wrong, and what is worth reusing next time.
 **Status:** `amscap` printed successfully at 50 mm with a top lug, and came out well.
 The SVG is approved. The line has since been reworked into three products — a 56 mm
 keychain with the internalised mount copied off the previous Issaquah keychain, and two
-223 mm pendants on a chain loop. All are watertight; none of the three has been printed
-yet. Overall thickness and a new attachment concept are open for the next round.
+223 mm pendants whose chain bail is copied off the previous Issaquah pendant. All are
+watertight; none of the three has been printed yet. Overall thickness and a new
+attachment concept are open for the next round.
 
 ---
 
@@ -15,13 +16,17 @@ yet. Overall thickness and a new attachment concept are open for the next round.
 
 Almost every real problem in this project was found by measuring something that looked
 fine, and almost every wrong turn came from a number that was plausible but measured the
-wrong thing. **Six** separate metrics had to be thrown away and replaced, and two of
+wrong thing. **Eight** separate metrics had to be thrown away and replaced, and four of
 them were only caught because the number they produced looked odd enough to re-check.
 
 The habit that worked: **if a measurement decides a design choice, verify the
 measurement before trusting the choice.** The corollary learned in Phase 6: verify the
 *axis* too. A symmetric feature measured across the wrong direction reads as
-asymmetric, and looks exactly like a real defect.
+asymmetric, and looks exactly like a real defect. And its sharpest form, learned the
+same day: **when the tool disagrees with itself, fix the tool.** Two features in one
+slice, one accurate to 0.05 mm and one out by 10%, is not a part with a defect — it is
+an instrument with a bug, and compensating for it in the design makes the error
+permanent.
 
 ---
 
@@ -297,6 +302,114 @@ Two seconds of looking settled that the pendant uses a protruding ring loop rath
 the internalised slot. (`Expand-Archive` refuses a `.3mf` extension; copy to `.zip`
 first.)
 
+The trick paid off twice. When the chain loop later had to be copied exactly, the
+thumbnail was again what found it: `Copy of Issaquah.3mf` turned out to be the *keychain*
+plate — 17 copies of the "I", no loop anywhere — while `Issaquah (3).3mf`'s
+`Metadata/top_1.png` showed the bail straight away. Guessing from geometry would have
+meant sectioning both files' worth of objects blind.
+
+### Wrong metric #7 — guessing at a hole from its vertices
+
+The first attempt to measure that bail (`measure-pendants.js`) inferred the opening from
+vertex positions and returned **45.94 × 22.03 mm**, which is not a shape the mesh
+contains. Vertices tell you where surfaces are, not which side of them is air.
+
+`measure-loop.js` does it properly: intersect every triangle with a z-plane to get real
+section segments, scanline-fill the closed loops those segments form, then flood-fill the
+background inward from the border. Anything filled that the flood never reaches is a
+genuine enclosed hole. It reported **42.00 × 30.40** with a clean bbox, area and equivalent
+diameter, and — importantly — reported **zero** holes at z = −3.50, correctly noticing
+that the bail does not run the full thickness of that particular object.
+
+### Then look at the numbers, not just the picture
+
+The section dump looked like a rounded arch, which suggested some hand-drawn profile that
+would have to be traced. Scanning it row by row instead showed it was two exactly
+concentric circles, r29.5 and r21, centred 9.6 units above the letter's top edge:
+
+| y | measured half width | circle r29.5 at (0, 170) |
+| --- | --- | --- |
+| 192.7 | 19.0 | 18.8 |
+| 170.0 | 29.4 | 29.5 |
+| 161.5 | 28.2 | 28.2 |
+
+The "arch" is just what a circle looks like once the body's edge cuts its bottom off. Two
+constants reproduce it exactly, and `addLug` already drew discs.
+
+### Copying a reference is not the same as copying its numbers
+
+Issaquah sinks the hole 6.4 mm (scaled) *below* the silhouette edge, so the flat top of
+the "I" becomes the hole's floor. Reproducing that literally on the dragon would have cut
+6.4 mm into a gray keyline measured at only about **3 mm** deep — straight through into
+the green. Setting `embed` equal to the wall thickness instead puts the hole exactly
+tangent to the edge, and the opening actually gets *larger*: a full 23.5 mm circle rather
+than Issaquah's 23.5 × 17.0 mm arch. What had to be copied was the size the chain passes
+through, not the way it was positioned on a different silhouette.
+
+### The notch had been drawn in from the start
+
+`addLug` painted its disc gray and erased every other colour across the whole disc — fine
+for a lug hanging off an edge, wrong for a loop deliberately sunk into the body, where it
+erased a lune of green and left a visible notch in the band along the dragon's back. A
+`behind` mode now paints gray only where the plate was empty before and erases nothing.
+
+The build no longer takes that on trust. The ring branch snapshots every colour mask
+before the lug goes on and prints how much of each was lost. Non-zero on a drawn colour
+is the notch returning, and it would say so.
+
+### An absence is a measurement
+
+The ring was copied as a plain annulus, and it took a correction to notice the reference
+is **split** so a chain link can be fed in. What found it was not a positive reading but
+a missing one: run over all 21 Issaquah STLs, `Issaquah (14).stl` has exactly the same
+bounding box as `(6)` and `(9)` yet reports **zero enclosed holes**, because the cut lets
+the flood fill escape to the border. The same pairing shows up in `(10)` and `(11)`, the
+bail on its own. A tool that reports "nothing here" is still telling you something, as
+long as you have a matched case to compare it against.
+
+### Section across the feature and you will never see it
+
+The cut was easy to locate in plan — radial, at 12 o'clock, dead on the ring's centre
+line — and impossible to characterise, because **the profile varies through the
+thickness** and every slice was being taken across it. Each one showed the same plain
+gap. The fix was an `AXIS` option that permutes the coordinates before slicing, so the
+identical code cuts edge-on. The first edge-on section showed two opposing arrowheads
+meeting at mid-depth: an hourglass, not a channel.
+
+Worth pairing with a smaller trap from the same hour: filtering the output with
+`Select-String "z=|gap"` silently dropped every row that had no gap, which briefly made
+it look as though the ring vanished at low z. Filters hide the negative space, which by
+then was the whole point.
+
+### Wrong metric #8 — even-odd parity cannot see a union
+
+The funnel is built by cutting the slot at its full width and adding two triangular
+prisms back, sunk 0.8 mm into the ring so the slicer has a real intersection to weld
+rather than two coincident faces. Measured afterwards, the finished mesh appeared to have
+a **1.1 mm void running the full height of the wall on both sides**, and a slot 6.6 mm
+wide where 6.0 mm was asked for.
+
+Both were fabrications of the measuring tool. `fill()` used even-odd scanline parity,
+which is correct only for a single non-self-intersecting outline. These parts are unions
+of separate closed shells that deliberately overlap, and across an overlap the scanline
+crosses two boundaries going *in*, so parity flips back to "outside" and reports solid
+material as air. The phantom void was exactly as wide as the overlap — which is why
+increasing the overlap from 0.3 mm to 0.8 mm made it worse, and why it looked so
+convincing both times.
+
+The tell was available and got argued past: the ring hole in the same section measured
+23.55 mm against 23.6 mm designed. A tool that is accurate to 0.05 mm on one feature and
+10% out on another, in the same slice, is not measuring a defect — it is broken. The
+first response was to add a 0.6 mm kerf compensation to the builder to cancel the error,
+which would have baked a permanent 0.6 mm mistake into the part to satisfy a bad reading.
+
+`sectionZ` now orients each section segment from its triangle's outward normal, and
+`fill` accumulates signed winding instead of parity, so overlapping solids stay solid.
+The hole still measures 23.55 mm, the phantom slivers are gone, the kerf hack was
+reverted, and the slot measures 6.15 mm at both faces closing to **1.40 mm** at exactly
+mid-depth, symmetric to the last row. Nonzero is also robust to a globally flipped mesh,
+which even-odd got away with only by accident.
+
 ### Stacked shells must be checked one at a time
 
 The plate is now three extrusions stacked face to face. Checked as one merged soup, the
@@ -341,6 +454,12 @@ parts tile exactly.
 - **`jimp@0.22.12` uses the classic API** — default export, `new Jimp(w,h,color)`,
   `getBufferAsync`, `writeAsync`. Newer docs describe a different API.
 - **PowerShell here has no `&&`, `||` or heredocs.** Use `;` and `if ($?) { }`.
+- **Clamping an index without clamping the origin makes a tool lie quietly.**
+  `measure-loop.js`'s `crop` clamped its start index to the grid but went on reporting
+  the *requested* window origin, so a window reaching 1 mm past the mesh shifted every
+  coordinate by 1 mm — enough to make a symmetric funnel look 1 mm off-centre and send
+  the search after a bug in the geometry. It now returns where the crop actually starts
+  and says so when it differs.
 - **Delete stale build artifacts rather than leaving them.** A comparison PNG from
   before a change is a trap for whoever looks next.
 
@@ -351,6 +470,12 @@ parts tile exactly.
 - **Raster logo to clean SVG** — `lib-color.js` + `lib-curve.js` + phases 1–5
 - **Mask to watertight STL** — `lib-mesh.js`, handles holes, multi-shell, per-solid
   manifold verification
+- **Measuring any mesh, ours or a reference** — `measure-loop.js`: sections an `.stl` or
+  a 3mf `.model` on any axis (`AXIS` permutes the coordinates, so features that vary
+  through the thickness can be cut edge-on), nonzero-winding fill so unions of
+  overlapping shells read correctly, flood-fill hole detection with bbox/area/equivalent
+  diameter, row-by-row material runs for dimensioning slots and angles, and magnified
+  per-slice PNG dumps
 - **Printability audit** — `7-analyze-print.js`: connectivity, exact distance transform,
   honest thin-feature test, keyring spot finder, heatmap
 - **STL preview without a slicer** — `9-preview-stl.js`, orthographic z-buffer with
@@ -386,8 +511,18 @@ building any geometry saved rebuilding everything.
   reporting apply automatically
 - Neither the 56 mm keychain nor either pendant has been printed yet. The 50 mm
   keychain has, and came out well
-- The pendants are large prints; at 15 mm thick they are also heavy, and the 18.4 mm
+- The pendants are large prints; at 15 mm thick they are also heavy, and the 23.1 mm
   chord at the chain loop has not been load-checked against a real chain
+- The bail is sized off Issaquah in absolute millimetres, so on a 223 mm pendant it
+  protrudes 28 mm. That is correct for the chain but is a large visual element; it is
+  three numbers in `RING` if it wants scaling back
+- **The 1.40 mm throat is copied from the reference and is tight.** It is meant to be:
+  a link springs past it and cannot fall back out. But it was measured off an 8 mm ring
+  and is now being asked to work on a 15 mm one, and it has not been tried against the
+  real chain. `RING.slot.throat` widens it
+- Whether the ring should also be thinned toward the reference's 8 mm rather than
+  running the full plate thickness. The funnel adapts either way — it spans whatever
+  the ring's own stack height is, 15.0 mm on `flush`/`amscap` and 11.4 mm on `tiered`
 - `5-export-layers.js` fit params never retuned; `layers/gray.svg` is heavier than its
   siblings
 - Watertightness is verified for every product and style. **Printability is only
