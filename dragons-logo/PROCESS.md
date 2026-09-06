@@ -410,8 +410,26 @@ reverted, and the slot measures 6.15 mm at both faces closing to **1.40 mm** at 
 mid-depth, symmetric to the last row. Nonzero is also robust to a globally flipped mesh,
 which even-odd got away with only by accident.
 
-### Stacked shells must be checked one at a time
+### Cost the design before printing it, then check the model against reality
 
+The tiered pendant took 20 tool changes, and the obvious lever — how high each colour
+sits — was not connected to anything the build reported. Tool changes fall out of which
+colours are live at which heights, so they can be counted from the colour bands without
+slicing.
+
+The step that made it useful was checking the estimate against the print that had already
+happened: the model returns exactly **20 at a 0.3 mm layer**, which both confirms the
+model and pins down the layer height the number refers to. An estimate that has never
+been compared to a real print is a guess with a decimal point.
+
+What it then showed is that the intuition about which step to cut was only half right.
+Levelling white and red saves 8 changes, because every layer between them carried two
+filaments instead of one. **Lowering green saves none** — above the last layer white and
+red share there is only one filament left, so the dragon's height is free. Worth doing
+for proportion, material and time; not for purge. Without the estimator both changes
+would have looked equally productive.
+
+### Stacked shells must be checked one at a time
 The plate is now three extrusions stacked face to face. Checked as one merged soup, the
 shared faces get counted twice and the manifold test reports a leak that isn't there.
 Each shell is checked separately — the same idiom `amscap`'s two-shell gray part
@@ -478,6 +496,10 @@ parts tile exactly.
   per-slice PNG dumps
 - **Printability audit** — `7-analyze-print.js`: connectivity, exact distance transform,
   honest thin-feature test, keyring spot finder, heatmap
+- **Tool-change and purge estimate** — `8-build-stl.js` reports filament changes per
+  style at 0.2/0.28/0.3 mm layers, straight from the colour bands, before anything is
+  sliced. Validated against a real print: it reproduced the observed 20 changes on the
+  tiered pendant exactly, which is what made it safe to redesign the tiers against it
 - **STL preview without a slicer** — `9-preview-stl.js`, orthographic z-buffer with
   Lambertian shading, grids every variant into one contact sheet
 - **Tolerance sweep with evidence** — `6-sweep-fit.js`
@@ -506,6 +528,9 @@ building any geometry saved rebuilding everything.
 - Thickness. The keychain is 5.6 mm total against Issaquah's 9.0 mm (6.0 base + 3.0
   raised). 5 mm of base is what was asked for; matching Issaquah outright is a
   `plateH` / `reliefH` change in `PRODUCTS`
+- The tiered pendant is now **13.8 mm**, not 15.0, because green came down 1.2 mm with
+  red. If the 15 mm is wanted back it is `plateH: 11.4 → 12.6`, which costs nothing in
+  tool changes because gray-only layers are free
 - A new attachment concept to evaluate; `applyKeyring` dispatches on a mode string, so
   it is one branch plus a `PRODUCTS` entry, and the manifold, hang-angle and load-path
   reporting apply automatically

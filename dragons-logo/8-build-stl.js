@@ -83,7 +83,19 @@ const PRODUCTS = [
     // Lowest to highest, back of the image to front: the gray keyline is the
     // frame, the ball sits inside it, the seams sit on the ball, and the dragon
     // stands in front of all of it. Heights are above the base plate.
-    tiers: { gray: 0.0, white: 1.2, red: 2.4, green: 3.6 },
+    //
+    // White and red share a step. They used to be 1.2mm apart, which cost 8 tool
+    // changes - every layer between them held two filaments instead of one - and
+    // bought very little, because the seams sit *on* the ball and read as raised
+    // by their colour rather than by their height. Levelling them takes the
+    // print from 20 changes to 12 at a 0.3mm layer.
+    //
+    // Green then comes down by the same 1.2mm to keep the dragon one clear step
+    // proud of the ball rather than two. That step is free either way: above the
+    // last shared layer only one filament is left, so green can stand as high as
+    // it likes without costing a change. It is lowered for proportion and for
+    // the material and time it saves, not for purge.
+    tiers: { gray: 0.0, white: 1.2, red: 1.2, green: 2.4 },
   },
 ];
 
@@ -649,6 +661,61 @@ function triPrism(a, b, c, yA, yB) {
 }
 
 /**
+ * The z-band each filament occupies, in print order.
+ *
+ * Purge is driven by tool changes, and a tool change happens wherever a layer
+ * contains a colour the previous stretch of printing did not. That is decided
+ * entirely by which colours are live at which heights, so it can be read off
+ * the build before anything is sliced.
+ */
+function colourBands(style, p) {
+  if (style === 'emboss') {
+    return [
+      { name: 'plate', z0: 0, z1: PLATE_H },
+      { name: 'red', z0: PLATE_H, z1: FLUSH_H },
+      { name: 'green', z0: PLATE_H, z1: FLUSH_H },
+    ];
+  }
+  if (style === 'amscap') {
+    return [
+      { name: 'gray', z0: 0, z1: FLUSH_H },
+      { name: 'white', z0: PLATE_H, z1: FLUSH_H },
+      { name: 'red', z0: PLATE_H, z1: FLUSH_H },
+      { name: 'green', z0: PLATE_H, z1: FLUSH_H },
+    ];
+  }
+  const t = p.tiers;
+  const bands = [{ name: 'gray', z0: 0, z1: PLATE_H + t.gray }];
+  for (const name of ['white', 'red', 'green']) {
+    if (t[name] > 0) bands.push({ name, z0: PLATE_H, z1: PLATE_H + t[name] });
+  }
+  return bands;
+}
+
+/**
+ * Tool changes for a stack of colour bands at a given layer height.
+ *
+ * Assumes the slicer visits the colours present in a layer in a fixed order and
+ * returns to the first for the next layer, which is the pessimistic case - it
+ * does not credit the saving available from printing alternate layers in
+ * reverse. Worth stating because the number is only useful if it matches the
+ * slicer, and this model reproduces the 20 changes actually observed on the
+ * tiered pendant at 0.3mm exactly.
+ */
+function filamentChanges(bands, layerH) {
+  const top = Math.max(...bands.map((b) => b.z1));
+  let cur = null, changes = 0;
+  for (let i = 0; i < Math.round(top / layerH); i++) {
+    const z0 = i * layerH, z1 = z0 + layerH;
+    for (const b of bands) {
+      if (b.z0 >= z1 - 1e-6 || b.z1 <= z0 + 1e-6) continue;
+      if (b.name !== cur) { changes++; cur = b.name; }
+    }
+  }
+  return Math.max(0, changes - 1);   // loading the first filament is not a change
+}
+
+/**
  * The two wedges that turn the straight feed slot into the reference's funnel.
  *
  * The slot is already cut to its full mouth width in the plan mask, so what is
@@ -873,8 +940,7 @@ function writePart(dir, name, shells) {
       }
 
       // Centre every colour by the same offset so the parts still line up.
-      const flat = [];
-      for (const shells of Object.values(per)) for (const s of shells) flat.push(...s);
+      const flat = [];      for (const shells of Object.values(per)) for (const s of shells) flat.push(...s);
       const size = recenter(flat);
 
       let tris = 0, bad = 0;
@@ -893,6 +959,10 @@ function writePart(dir, name, shells) {
           Object.entries(t).sort((a, b) => a[1] - b[1])
             .map(([n, v]) => `${n} +${v.toFixed(1)}`).join('  ->  '));
       }
+
+      const bands = colourBands(style, p);
+      console.log('     filament changes: ' +
+        [0.2, 0.28, 0.3].map((h) => `${filamentChanges(bands, h)} at ${h}mm`).join(',  '));
 
       // Record where the mount ended up so a section can be cut through it
       // without guessing. The plate is recentred after it is built, so this is

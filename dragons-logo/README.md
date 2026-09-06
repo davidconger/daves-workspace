@@ -169,7 +169,7 @@ stl/pendant-223mm-tiered/tiered/{gray,white,red,green}.stl
 |---|---|---|---|
 | `keychain-56mm` | 56 mm tall × 69.5 mm | 5.6 mm | internalised slot |
 | `pendant-223mm-flush` | 223 mm wide × 178.3 mm | 15.0 mm | 33 mm chain bail, 23.5 mm hole |
-| `pendant-223mm-tiered` | 223 mm wide × 178.3 mm | 15.0 mm | 33 mm chain bail, 23.5 mm hole |
+| `pendant-223mm-tiered` | 223 mm wide × 178.3 mm | 13.8 mm | 33 mm chain bail, 23.5 mm hole |
 
 The pendants measure 178.3 mm rather than the artwork's 179.6 mm because the flare
 sweeping back from the head is cut short to clear the chain; the loop then becomes the
@@ -258,8 +258,35 @@ colour with a filament swap at the 5.0 mm step, or leave it as a relief.
 multi-part object and assign a filament to each.
 
 **tiered** steps each colour to its own height above a common base, back of the image
-to front — gray keyline lowest, then white ball, then red seams, then the green dragon
-highest. Copied from the Mariners reference plaque.
+to front — gray keyline lowest, then the white ball and red seams together, then the
+green dragon highest. Copied from the Mariners reference plaque.
+
+### Levelling white and red halves the tool changes
+
+Purge is paid per tool change, and a tool change happens wherever a layer holds a colour
+the previous stretch of printing did not. That is decided entirely by which colours are
+live at which heights, so the build now reports it before anything is sliced:
+
+| | white | red | green | changes at 0.3 mm |
+|---|---|---|---|---|
+| was | +1.2 | +2.4 | +3.6 | **20** |
+| now | +1.2 | +1.2 | +2.4 | **12** |
+
+The saving is all in white and red. Separating them by 1.2 mm meant every layer between
+them carried two filaments instead of one, at 2 changes a layer, for a step that bought
+very little — the seams sit *on* the ball and read as raised because they are red, not
+because they are 1.2 mm higher.
+
+**Green's height is free.** Above the last layer that white and red share, only one
+filament is left, so the dragon can stand as high as it likes without costing a change.
+It comes down by the same 1.2 mm to keep it one clear step proud of the ball rather than
+two, and to save the material and time — not for purge. That also takes the pendant from
+15.0 mm to **13.8 mm** overall; `plateH: 11.4 → 12.6` puts it back to 15.0 at no cost in
+changes, since gray-only layers are free.
+
+For comparison the flush `amscap` pendant is 7 changes at 0.3 mm, because all four
+colours are confined to the top 0.6 mm. `tiered` costs more by design: the steps are the
+point of it.
 
 ### The internalised mount
 
