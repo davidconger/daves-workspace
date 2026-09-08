@@ -16,7 +16,7 @@ attachment concept are open for the next round.
 
 Almost every real problem in this project was found by measuring something that looked
 fine, and almost every wrong turn came from a number that was plausible but measured the
-wrong thing. **Eight** separate metrics had to be thrown away and replaced, and four of
+wrong thing. **Nine** separate metrics had to be thrown away and replaced, and four of
 them were only caught because the number they produced looked odd enough to re-check.
 
 The habit that worked: **if a measurement decides a design choice, verify the
@@ -27,6 +27,13 @@ same day: **when the tool disagrees with itself, fix the tool.** Two features in
 slice, one accurate to 0.05 mm and one out by 10%, is not a part with a defect — it is
 an instrument with a bug, and compensating for it in the design makes the error
 permanent.
+
+The ninth arrived last and was different in kind: not a number measured wrongly but a
+number **never measured at all**, because it had been inherited rather than chosen. The
+ring was as thick as the plate simply because everything is, so no decision existed to
+review. The extension: **an inherited value is still a value.** And with it, the reason
+a copied dimension is weaker than a copied construction — copy the profile and it holds
+until something changes; copy how the thing was built and it follows.
 
 ---
 
@@ -429,6 +436,68 @@ red share there is only one filament left, so the dragon's height is free. Worth
 for proportion, material and time; not for purge. Without the estimator both changes
 would have looked equally productive.
 
+### Wrong metric #9 — the right hole on the wrong ring
+
+The pendant printed, looked right, and still failed: the chain would not go on. Every
+number that had been measured was correct. The hole was 24.8 mm, sectioned and confirmed
+against the reference. The one number that mattered had never been *asked*: how thick the
+ring is.
+
+It was never asked because it never looked like a variable. Everything in this builder is
+a plan mask extruded to one height, and that works precisely because every feature shares
+the plate's thickness. The ring inherited 11.4 mm from the plate the way everything else
+does, so there was no moment where a thickness got chosen and could have been chosen
+wrong. Issaquah's bail is **8 mm** and always was — visible in `(10)`/`(11)`, which are
+that bail alone at 59 × 59 × 8, and stated as `8.00` in the original model.
+
+The lesson is not "measure the thickness". It is that **an inherited value is still a
+value**, and it is the one kind that never appears in a review, because there is no line
+of code to look at. The features that had been thought about — hole, wall, chord, funnel,
+balance — were all right.
+
+Fixing it meant breaking the assumption rather than patching a number: the ring is now
+its own solid, extruded 0 → 8 mm and unioned with the plate. That in turn deleted a whole
+earlier fix. The `behind` lug mode existed only because the ring, painted into the colour
+masks, could erase the green band; a separate solid touches no colour mask and *cannot*.
+The check flipped with it — from "how much artwork did the loop eat" to "is the loop
+actually attached", now reported as 85 mm² of weld.
+
+### Copy the construction, not just the profile
+
+The feed slot had been reproduced from its measured profile: a 6 mm mouth closing to a
+1.4 mm throat, both copied absolutely. That was faithful and it was fragile. When the ring
+went from 15 mm to 8 mm the 1.4 mm had nothing left to mean — it had been read off an 8 mm
+reference, applied to a 15 mm ring, and was now being applied to an 8 mm one again by
+coincidence rather than by reason.
+
+Then the actual construction turned up: not a V, but **two triangles**, each 10 units wide
+and 5 tall, pointing at each other through an 8 unit ring. The union of two crossing
+triangles has half width `max(5 − z, z − 3)`, and the maximum of two straight lines is
+two straight lines — which is exactly why the section had read as a clean V, and why
+reading it as a V had been good enough to build from but not good enough to *scale*. The
+overlap in the middle is the whole point: it is what stops the throat closing to nothing.
+
+The profile could not have revealed that. Two triangles and a V are the same picture. The
+difference only shows when something changes.
+
+Checking it took one line of arithmetic against measurements already taken: at z=18.79 the
+construction predicts a 3.58 unit gap; the section had recorded 3.60. So the throat became
+a rule rather than a constant —
+
+```
+throat = mouth × (1 − (thick / 2) / tall)
+```
+
+— and when the ring changed to 8 mm the throat followed to 1.20 mm on its own. The built
+mesh sections at 6.15 mm on both faces and 1.20 mm at exactly mid-depth.
+
+The same pass caught a smaller version of the same error. The build had been logging the
+funnel angle as 31°, computed from mouth and throat. The real faces run at **39°**, because
+the wedges are sunk 0.8 mm into the ring wall to give the slicer a real intersection
+instead of coincident faces, so the slope starts further out and reaches the apex in the
+same half thickness. The dimensions were right and the description of them was wrong,
+which is the kind of thing that stays wrong until a section is laid next to it.
+
 ### Stacked shells must be checked one at a time
 The plate is now three extrusions stacked face to face. Checked as one merged soup, the
 shared faces get counted twice and the manifold test reports a leak that isn't there.
@@ -536,18 +605,17 @@ building any geometry saved rebuilding everything.
   reporting apply automatically
 - Neither the 56 mm keychain nor either pendant has been printed yet. The 50 mm
   keychain has, and came out well
-- The pendants are large prints; at 15 mm thick they are also heavy, and the 23.1 mm
+- The pendants are large prints; at 15 mm thick they are also heavy, and the 24.4 mm
   chord at the chain loop has not been load-checked against a real chain
 - The bail is sized off Issaquah in absolute millimetres, so on a 223 mm pendant it
-  protrudes 28 mm. That is correct for the chain but is a large visual element; it is
+  protrudes 29.8 mm. That is correct for the chain but is a large visual element; it is
   three numbers in `RING` if it wants scaling back
-- **The 1.40 mm throat is copied from the reference and is tight.** It is meant to be:
-  a link springs past it and cannot fall back out. But it was measured off an 8 mm ring
-  and is now being asked to work on a 15 mm one, and it has not been tried against the
-  real chain. `RING.slot.throat` widens it
-- Whether the ring should also be thinned toward the reference's 8 mm rather than
-  running the full plate thickness. The funnel adapts either way — it spans whatever
-  the ring's own stack height is, 15.0 mm on `flush`/`amscap` and 11.4 mm on `tiered`
+- The **1.20 mm throat** is no longer a copied constant — it is derived from the 6 mm
+  mouth, the 5 mm triangle height and the 8 mm ring, so it tracks any of them changing.
+  It is meant to be tight: a link springs past it and cannot fall back out. It has not
+  yet been tried against the real chain on a printed part, because the first print never
+  got that far — the ring was too thick to go on at all. `RING.slot.mouth` and `.tall`
+  are the levers
 - `5-export-layers.js` fit params never retuned; `layers/gray.svg` is heavier than its
   siblings
 - Watertightness is verified for every product and style. **Printability is only

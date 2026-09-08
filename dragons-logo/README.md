@@ -168,8 +168,8 @@ stl/pendant-223mm-tiered/tiered/{gray,white,red,green}.stl
 | Product | Size | Thick | Mount |
 |---|---|---|---|
 | `keychain-56mm` | 56 mm tall × 69.5 mm | 5.6 mm | internalised slot |
-| `pendant-223mm-flush` | 223 mm wide × 178.3 mm | 15.0 mm | 33 mm chain bail, 23.5 mm hole |
-| `pendant-223mm-tiered` | 223 mm wide × 178.3 mm | 13.8 mm | 33 mm chain bail, 23.5 mm hole |
+| `pendant-223mm-flush` | 223 mm wide × 178.3 mm | 15.0 mm | 34.8 mm chain bail, 24.8 mm hole, 8 mm thick |
+| `pendant-223mm-tiered` | 223 mm wide × 178.3 mm | 13.8 mm | 34.8 mm chain bail, 24.8 mm hole, 8 mm thick |
 
 The pendants measure 178.3 mm rather than the artwork's 179.6 mm because the flare
 sweeping back from the head is cut short to clear the chain; the loop then becomes the
@@ -367,32 +367,64 @@ something simpler — **two exactly concentric circles**, outer r29.5 and inner 
 | 170.0 | 29.4 | 29.5 |
 | 161.5 | 28.2 | 28.2 |
 
-After the 0.56: a **23.5 mm hole in a 4.8 mm wall, 33 mm across**. Like the slot, those
-figures are stored in millimetres and converted at draw time, because a chain is the same
-chain whatever the logo is scaled to.
+The circles are r29.5 outer, r21 inner, an 8.5 wall, in model units. What they print as
+depends on the build item: the `(3)` file scales XY by 0.56, the `(14)` file by 0.59.
+Taking **0.59** for all of it — the same file the slot and the thickness below come from,
+rather than a hybrid of two — gives a **24.8 mm hole in a 5.0 mm wall, 34.8 mm across**.
+Like the slot, those figures are stored in millimetres and converted at draw time, because
+a chain is the same chain whatever the logo is scaled to.
 
 **One deliberate difference.** Issaquah sinks the *hole* 6.4 mm (scaled) below the
 silhouette edge, so the arch's legs land on the edge and the flat top of the "I" forms
 the hole's floor. Repeating that on the dragon would cut straight through the green,
 because the gray keyline it would have to stay inside is only about **3 mm** deep there.
 So `embed` is set equal to the wall instead, which puts the hole exactly **tangent** to
-the edge. It costs nothing: the opening becomes a full 23.5 mm circle rather than
+the edge. It costs nothing: the opening becomes a full 24.8 mm circle rather than
 Issaquah's 23.5 × 17.0 mm arch — if anything more generous — and the joint into the body
-is still a **23.1 mm chord**.
+is still a **24.4 mm chord**.
+
+### The ring is 8 mm thick, and that is why it is not part of the plate
+
+The first pendant printed correctly and still failed: **the chain would not go over the
+ring**. Nothing was wrong with the hole, which is 24.8 mm. The ring was simply as thick as
+the plate it was cut from — 11.4 mm on the tiered pendant — and the chain's links close
+over a bail far thinner than that.
+
+Issaquah's bail is **8 mm**, and says so three ways. `Issaquah (10).stl` and `(11).stl`
+are that bail on its own and measure 59 × 59 × 8. The original Tinkercad model dimensions
+it at 8.00. And neither build item scales Z, so 8 units is 8 mm on the plate.
+
+That one number breaks an assumption the builder was built on. Everything else here is
+drawn as a **plan mask** and extruded to a single height, which works precisely because
+every feature shares the plate's thickness. A mask says *where*, not *how tall*, and the
+ring now differs from the plate in exactly the second one. So the ring stops being part
+of `m.plate` and becomes **its own solid**, extruded 0 → 8 mm and unioned with the plate,
+which stands 3.4 mm proud of it on the tiered pendant and 7 mm on the flush one.
+
+It sits on the **bed**, not the front face. That is what "on the baseplate" means, and it
+is also the only printable choice: flush with the front, the ring would float 3.4 mm in
+the air and need support underneath.
+
+This retires a whole class of bug rather than fixing one. The `behind` lug mode below
+existed because the ring, being painted into the colour masks, could erase artwork. A
+separate solid touches no colour mask at all, so it *cannot* notch the green — the mode
+is deleted rather than guarded. What replaces the check is the opposite question, since
+the new failure would be a ring that is not attached: the build measures the overlap
+between the ring's annulus and the plate and prints it, **85 mm² across a 24.4 mm chord**.
+Zero there would mean a loose hoop printing next to the pendant.
 
 ### The loop grows out from behind the artwork
 
 The original `addLug` painted its disc gray and erased every other colour across the
 whole disc. On a lug hanging off an edge that is invisible; on a loop deliberately sunk
 into the body it erased a lune of green and left a notch in the band along the dragon's
-back. The fix is a `behind` mode that paints gray **only where the plate was empty
-before** and erases nothing, so the green curve carries on unbroken and the loop reads as
-emerging from behind it.
+back. The first fix was a `behind` mode that painted gray **only where the plate was
+empty before** and erased nothing.
 
-Because the previous build failed at exactly this point, it is now counted rather than
-trusted: the ring branch snapshots every colour mask, and the build prints how much of
-each was lost inside the lug. Anything but zero on a drawn colour is the notch coming
-back.
+Making the ring a separate solid superseded that, and `behind` is gone. The green curve
+still carries on unbroken and the loop still reads as emerging from behind it — but now
+because the loop is *physically* behind and below it, rather than because the painting
+order was careful.
 
 ### The feed slot
 
@@ -418,27 +450,55 @@ Measured at the wall, in model units:
 | gap | 9.20 | 6.80 | 4.80 | **2.40** | 3.60 | 5.60 | 8.00 |
 
 Both branches are straight and meet exactly at the middle, so it is a true V rather than
-a channel: **6.0 mm at each face, pinching to a 1.42 mm throat**. A link is sprung past
-the throat and then cannot fall back out.
+a channel.
 
-**What gets copied is the mouth and the throat, not the angle.** Those two numbers are
-what a link has to pass, and they are proven against the chain he actually uses. The
-reference achieves them across an 8 mm ring; ours is the full 15 mm, so holding the
-*angle* instead would force a mouth of about 10 mm on a 33 mm ring. Keeping the
-dimensions and letting the angle fall out gives 17° here against the reference's 30°,
-which only means a longer, gentler funnel.
+**The V is not drawn as a V.** It is cut by two triangles, each 10 units wide at its own
+face and 5 units tall, pointing at each other through an 8 unit ring — which is how the
+original was built, and it explains a detail the section alone does not. Two triangles
+crossing like that have a union whose half width is `max(5 − z, z − 3)`, and the maximum
+of two straight lines is two straight lines, so the profile *reads* as a clean V. But
+they overlap by 2 units in the middle, and that overlap is what stops the throat closing
+to nothing. At z=4 both give 1, so the throat is **2 units, not 0**.
+
+The measurements agree to a hundredth. At z=18.79 — 4.79 up an 8 unit ring starting at
+14 — the model says `max(0.21, 1.79) × 2 = 3.58`. Measured 3.60.
+
+So the slot is specified the way it was built, as a **mouth and a triangle height**, and
+the throat falls out of them and the ring thickness:
+
+```
+throat = mouth × (1 − (thick / 2) / tall)
+```
+
+In printed millimetres — XY scales by 0.59, Z does not — that is a **6.0 mm mouth, 5 mm
+triangles through an 8 mm ring, and a 1.2 mm throat**. A link is sprung past the throat
+and then cannot fall back out.
+
+That derivation earns its keep immediately. The previous build had the throat hard-coded
+at 1.4 mm, which was right for the 15 mm ring it was measured onto and became arbitrary
+the moment the ring went to 8 mm. Expressed as a rule, it simply followed.
 
 Implementing it needs geometry rather than a mask, since a plan mask has no way to say
-"narrower in the middle". The slot is cut at its full mouth width in every colour mask,
-and two triangular prisms are added back, tapering to the throat at mid-depth. They are
-deliberately sunk 0.8 mm into the ring: a slicer welds an overlap reliably, whereas two
-exactly coincident faces are a coin toss.
+"narrower in the middle". The slot is cut at its full mouth width, and two triangular
+prisms are added back, tapering to the throat at mid-depth. They are deliberately sunk
+0.8 mm into the ring: a slicer welds an overlap reliably, whereas two exactly coincident
+faces are a coin toss.
 
-Measured back off the finished mesh, which is the only thing that counts:
+That 0.8 mm bite does not move either dimension a link has to pass — the mouth is still
+bounded by the slot wall, the throat by the apex — but it does steepen the taper between
+them, because the sloped face starts further out and still has to reach the apex in the
+same half thickness. The opening is therefore at full mouth for the outer millimetre of
+each face and closes over the remaining 3 mm, at 39° rather than the nominal 31°. Worth
+saying out loud, because the build log claimed the nominal figure until the section
+disagreed with it.
 
-| depth (mm) | 1.6 | 3.1 | 4.5 | 6.0 | **7.5** | 9.0 | 10.5 | 11.9 | 13.4 |
+Measured back off the finished 8 mm ring, which is the only thing that counts:
+
+| depth (mm) | 0.4 | 1.3 | 2.2 | 3.1 | **4.0** | 5.0 | 5.9 | 6.8 | 7.7 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| gap (mm) | 6.15 | 5.10 | 3.90 | 2.60 | **1.40** | 2.60 | 3.90 | 5.10 | 6.15 |
+| gap (mm) | 6.15 | 5.60 | 4.00 | 2.60 | **1.20** | 2.80 | 4.20 | 5.70 | 6.15 |
+
+The throat lands at exactly mid-depth of a ring whose crown sections at z 0.000..8.000.
 
 ### Where the top lug goes, and why the flare gets cut
 
