@@ -4,13 +4,13 @@ Using https://en.wikipedia.org/wiki/Terri_Clark as the song-source reference, I 
 
 ## ⭐ The pick
 
-> @terriclarkmusic lit up @tacomadome with Better Things to Do, and Tacoma was fully locked in by the time @codyjohnson stepped out. ✨ #LeatherTour (📸 @dcongerphoto)
+> Back at @tacomadome, where @terriclarkmusic says her first arena chapter opened for George Strait, she gave us Better Things to Do and one clear request. We need some fiddle before @codyjohnson. 🎻 #LeatherTour (📸 @dcongerphoto)
 
-Better Things to Do works because the title has confident momentum, which fits an opener setting pace and pulling the room forward before the headliner.
+Better Things to Do works because the title carries confident momentum, which fits an opener setting the pace and lifting the room before the headliner.
 
-If you want a punchier edge, this one keeps the same short structure and opener framing:
+If you want a punchier edge, this keeps the same short opener framing:
 
-> @terriclarkmusic had @tacomadome singing Girls Lie Too early, and the crowd stayed hot straight into @codyjohnson. 🔥 #LeatherTour (📸 @dcongerphoto)
+> @terriclarkmusic had @tacomadome singing Girls Lie Too early, then handed @codyjohnson a crowd ready to roll. 🔥 #LeatherTour (📸 @dcongerphoto)
 
 Girls Lie Too lands because it is one of her best-known hooks and reads instantly to a country crowd, which makes it strong for quick social copy.
 
