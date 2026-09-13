@@ -12,7 +12,7 @@ The gift here is **Colour by Numbers**, the 1983 album. It's a complete English 
 
 ## ⭐ The pick
 
-> Time (Clock of the Heart) rolled all the way back at @thefair. 🎡 @boygeorgeofficial and @cultureclubofficial opened the Grandstand series in full Colour by Numbers, and Puyallup sang Karma Chameleon like it was 1983. #DoThePuyallup (📸 @endimages)
+> Time (Clock of the Heart) rolled all the way back at @wastatefairec. 🎡 @boygeorgeofficial and @cultureclubofficial opened the Grandstand series in full Colour by Numbers, and Puyallup sang Karma Chameleon like it was 1983. #DoThePuyallup (📸 @endimages)
 
 **Time (Clock of the Heart)** opens the caption doing double duty. It was a US number two off *Kissing to Be Clever*, so it's instantly familiar to this audience, and used as the subject of "rolled all the way back" it describes the entire premise of a legacy act at a state fair. The parenthetical in the real title is what makes it work — you get a clock in the sentence for free.
 
@@ -26,7 +26,7 @@ The gift here is **Colour by Numbers**, the 1983 album. It's a complete English 
 
 ## If you want the opening-night news up front
 
-> Opening night of @thefair, opening night of the Grandstand series, and @boygeorgeofficial wasn't going to waste either one. 🎡 @cultureclubofficial turned Puyallup into full Colour by Numbers and forty years fell away somewhere around Karma Chameleon. #DoThePuyallup (📸 @endimages)
+> Opening night of @wastatefairec, opening night of the Grandstand series, and @boygeorgeofficial wasn't going to waste either one. 🎡 @cultureclubofficial turned Puyallup into full Colour by Numbers and forty years fell away somewhere around Karma Chameleon. #DoThePuyallup (📸 @endimages)
 
 The repetition of "opening night" is the point — it's two separate firsts and stacking them makes the fact land. Slightly longer than house style but it reads fast because the clauses are short.
 
@@ -36,7 +36,7 @@ The repetition of "opening night" is the point — it's two separate firsts and 
 
 **It's a Miracle** was a US number thirteen and UK number four off *Colour by Numbers*, and it's a natural English phrase, which the README flags as a free win.
 
-> @boygeorgeofficial and @cultureclubofficial opened @thefair the only way the 80s know how, in full Colour by Numbers. 🎡 Forty years on and Puyallup still sang every word back, which frankly felt like It's a Miracle. #DoThePuyallup (📸 @endimages)
+> @boygeorgeofficial and @cultureclubofficial opened @wastatefairec the only way the 80s know how, in full Colour by Numbers. 🎡 Forty years on and Puyallup still sang every word back, which frankly felt like It's a Miracle. #DoThePuyallup (📸 @endimages)
 
 "The only way the 80s know how" gives you the era without having to say "nostalgia," which is a word that slightly insults both the artist and the audience. Use this one if the crowd shots are the story.
 
@@ -44,7 +44,7 @@ The repetition of "opening night" is the point — it's two separate firsts and 
 
 ## Leaning on the fairground itself
 
-> Forty years of hits and a Ferris wheel behind them. 🎡 @boygeorgeofficial and @cultureclubofficial opened the @thefair Grandstand series in full Colour by Numbers, and Karma Chameleon still stops a crowd cold. #DoThePuyallup (📸 @endimages)
+> Forty years of hits and a Ferris wheel behind them. 🎡 @boygeorgeofficial and @cultureclubofficial opened the @wastatefairec Grandstand series in full Colour by Numbers, and Karma Chameleon still stops a crowd cold. #DoThePuyallup (📸 @endimages)
 
 Only run the first line if there's actually a wheel or midway visible in frame. If the shots are all tight on Boy George — and with that wardrobe they usually are — take the pick instead.
 
@@ -52,7 +52,7 @@ Only run the first line if there's actually a wheel or midway visible in frame. 
 
 ## Short, if the photo is a portrait
 
-> Still the best hat at @thefair. 🎡 @boygeorgeofficial and @cultureclubofficial opened the Grandstand series in full Colour by Numbers, forty years after Karma Chameleon and not a step slower. #DoThePuyallup (📸 @endimages)
+> Still the best hat at @wastatefairec. 🎡 @boygeorgeofficial and @cultureclubofficial opened the Grandstand series in full Colour by Numbers, forty years after Karma Chameleon and not a step slower. #DoThePuyallup (📸 @endimages)
 
 Boy George's hat is the signature and has been since 1982, so this is affectionate rather than a reach. Confirm he's actually wearing one in the frame you're posting. 😄
 
@@ -71,3 +71,20 @@ Boy George's hat is the signature and has been since 1982, so this is affectiona
 **Boy George's solo catalog is available if you need it.** *The Crying Game* and *Everything I Own* are both his and both well known to this audience. Neither fits a celebratory opening-night post, but if a later Fair recap needs a quieter tone they're there.
 
 **The billing is "Boy George & Culture Club."** That's how the Fair advertised it, so both handles belong in the caption. Tagging only the band undersells the draw and tagging only him erases the group — every option above carries both.
+
+---
+
+## ⚠️ Handle correction, made after this file was written
+
+Every caption above originally used `@thefair` for the Washington State Fair. **That handle
+is wrong.** It belongs to a private individual with 119 followers and one post, not the Fair.
+The correct account is **@wastatefairec** — verified, 34K followers, bio begins "Official
+account," and it is the handle linked from the footer of thefair.com. The "ec" stands for
+Washington State Fair Event Center, the organization's formal name.
+
+All five options above have been corrected in place. **If this post is already live, edit the
+caption** — a wrong tag notifies a stranger and does nothing for the Fair.
+
+Also worth adding on any Fair post: **#WAStateFair** is the hashtag the Fair itself publishes
+in its Instagram bio. #DoThePuyallup is the right slogan culturally, but it does not appear in
+the Fair's own page source, so pair the two rather than relying on the slogan alone.
